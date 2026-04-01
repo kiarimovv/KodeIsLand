@@ -419,13 +419,21 @@ struct InstanceRow: View {
                 // Content
                 VStack(alignment: .leading, spacing: 2) {
                     // Title row
-                    HStack {
+                    HStack(spacing: 4) {
                         Text(session.displayTitle)
                             .font(.system(size: 12, weight: .semibold))
                             .foregroundColor(titleColor)
                             .lineLimit(1)
 
                         Spacer(minLength: 0)
+
+                        // Terminal tag
+                        Text(terminalTag)
+                            .font(.system(size: 8, weight: .medium, design: .monospaced))
+                            .foregroundColor(.white.opacity(0.35))
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 1)
+                            .background(RoundedRectangle(cornerRadius: 3).fill(Color.white.opacity(0.06)))
 
                         Text(durationText)
                             .font(.system(size: 10))
@@ -435,6 +443,19 @@ struct InstanceRow: View {
                     // Subtitle
                     subtitleView
                 }
+
+                // Jump to terminal button
+                Button {
+                    onFocus()
+                } label: {
+                    Image(systemName: "terminal")
+                        .font(.system(size: 10))
+                        .foregroundColor(.white.opacity(0.3))
+                        .frame(width: 22, height: 22)
+                        .background(Circle().fill(Color.white.opacity(0.06)))
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 2)
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 7)
