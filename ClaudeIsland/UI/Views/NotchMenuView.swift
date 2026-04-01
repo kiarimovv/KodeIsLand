@@ -17,6 +17,7 @@ struct NotchMenuView: View {
     @ObservedObject private var screenSelector = ScreenSelector.shared
     @ObservedObject private var soundSelector = SoundSelector.shared
     @AppStorage("showGroupedSessions") private var showGrouped: Bool = false
+    @AppStorage("usePixelCat") private var usePixelCat: Bool = false
     @State private var hooksInstalled: Bool = false
     @State private var launchAtLogin: Bool = false
 
@@ -44,6 +45,14 @@ struct NotchMenuView: View {
                 isOn: showGrouped
             ) {
                 showGrouped.toggle()
+            }
+
+            MenuToggleRow(
+                icon: "cat",
+                label: "Pixel Cat Mode",
+                isOn: usePixelCat
+            ) {
+                usePixelCat.toggle()
             }
 
             Divider()

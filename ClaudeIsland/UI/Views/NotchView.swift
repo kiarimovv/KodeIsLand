@@ -547,11 +547,17 @@ struct CollapsedNotchContent: View {
 
     @State private var pulsePhase: Bool = false
     @ObservedObject private var buddyReader = BuddyReader.shared
+    @AppStorage("usePixelCat") private var usePixelCat: Bool = false
 
     var body: some View {
         HStack(spacing: 6) {
-            // Left: buddy emoji as animated pixel art
-            if let buddy = buddyReader.buddy {
+            // Left: pixel cat or buddy emoji pixel art
+            if usePixelCat {
+                PixelCharacterView(state: mostUrgentState)
+                    .scaleEffect(0.28)
+                    .frame(width: 14, height: 14)
+                    .matchedGeometryEffect(id: "crab", in: activityNamespace, isSource: true)
+            } else if let buddy = buddyReader.buddy {
                 EmojiPixelView(emoji: buddy.species.emoji, style: .wave)
                     .scaleEffect(0.3)
                     .frame(width: 14, height: 14)

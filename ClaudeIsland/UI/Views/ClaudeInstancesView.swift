@@ -105,15 +105,15 @@ struct ClaudeInstancesView: View {
                 // Left: ASCII sprite
                 VStack(spacing: 2) {
                     BuddyASCIIView(buddy: buddy)
-                        .frame(height: 55)
+                        .frame(height: 65)
                     Text(buddy.name)
-                        .font(.system(size: 10, weight: .bold))
+                        .font(.system(size: 12, weight: .bold))
                         .foregroundColor(.white)
                 }
-                .frame(width: 90)
+                .frame(width: 100)
 
                 // Right: stats + personality
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: 4) {
                     if buddy.stats.debugging > 0 {
                         asciiStatBar("DBG", value: buddy.stats.debugging, color: .cyan)
                         asciiStatBar("PAT", value: buddy.stats.patience, color: .green)
@@ -123,10 +123,10 @@ struct ClaudeInstancesView: View {
                     }
 
                     Text(buddy.personality)
-                        .font(.system(size: 7))
-                        .foregroundColor(.white.opacity(0.25))
+                        .font(.system(size: 8))
+                        .foregroundColor(.white.opacity(0.3))
                         .lineLimit(3)
-                        .padding(.top, 2)
+                        .padding(.top, 3)
                 }
             }
             .padding(.horizontal, 8)
@@ -157,16 +157,16 @@ struct ClaudeInstancesView: View {
 
         return HStack(spacing: 3) {
             Text(label)
-                .font(.system(size: 7, weight: .medium, design: .monospaced))
-                .foregroundColor(.white.opacity(0.3))
-                .frame(width: 22, alignment: .trailing)
+                .font(.system(size: 9, weight: .medium, design: .monospaced))
+                .foregroundColor(.white.opacity(0.35))
+                .frame(width: 26, alignment: .trailing)
             Text("[\(bar)]")
-                .font(.system(size: 7, design: .monospaced))
+                .font(.system(size: 9, design: .monospaced))
                 .foregroundColor(color.opacity(0.7))
             Text("\(value)")
-                .font(.system(size: 7, design: .monospaced))
+                .font(.system(size: 9, design: .monospaced))
                 .foregroundColor(color.opacity(0.5))
-                .frame(width: 18, alignment: .trailing)
+                .frame(width: 22, alignment: .trailing)
         }
     }
 
