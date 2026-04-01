@@ -9,15 +9,36 @@
 import Foundation
 
 enum L10n {
-    // Detect if system is Chinese
+    /// Language options: "auto" (system), "en", "zh"
+    static var appLanguage: String {
+        get { UserDefaults.standard.string(forKey: "appLanguage") ?? "auto" }
+        set { UserDefaults.standard.set(newValue, forKey: "appLanguage") }
+    }
+
     static var isChinese: Bool {
-        let lang = Locale.current.language.languageCode?.identifier ?? "en"
-        return lang == "zh"
+        switch appLanguage {
+        case "zh": return true
+        case "en": return false
+        default: // "auto"
+            let lang = Locale.current.language.languageCode?.identifier ?? "en"
+            return lang == "zh"
+        }
+    }
+
+    static var currentLanguageLabel: String {
+        switch appLanguage {
+        case "zh": return "中文"
+        case "en": return "English"
+        default: return isChinese ? "自动" : "Auto"
+        }
     }
 
     static func tr(_ en: String, _ zh: String) -> String {
         isChinese ? zh : en
     }
+
+    // Settings
+    static var language: String { tr("Language", "语言") }
 
     // MARK: - Session list
 

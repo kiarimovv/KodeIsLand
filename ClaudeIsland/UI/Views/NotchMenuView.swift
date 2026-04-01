@@ -55,6 +55,9 @@ struct NotchMenuView: View {
                 usePixelCat.toggle()
             }
 
+            // Language picker
+            LanguageRow()
+
             Divider()
                 .background(Color.white.opacity(0.08))
                 .padding(.vertical, 4)
@@ -313,6 +316,91 @@ struct MenuToggleRow: View {
         }
         .buttonStyle(.plain)
         .onHover { isHovered = $0 }
+    }
+
+    private var textColor: Color {
+        .white.opacity(isHovered ? 1.0 : 0.7)
+    }
+}
+
+// MARK: - Language Picker
+
+struct LanguageRow: View {
+    @State private var isExpanded = false
+    @State private var isHovered = false
+    @State private var current = L10n.appLanguage
+
+    private let options: [(id: String, label: String)] = [
+        ("auto", "Auto / 自动"),
+        ("en", "English"),
+        ("zh", "中文"),
+    ]
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isExpanded.toggle()
+                }
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "globe")
+                        .font(.system(size: 12))
+                        .foregroundColor(textColor)
+                        .frame(width: 16)
+
+                    Text(L10n.language)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(textColor)
+
+                    Spacer()
+
+                    Text(L10n.currentLanguageLabel)
+                        .font(.system(size: 11))
+                        .foregroundColor(.white.opacity(0.4))
+
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 9))
+                        .foregroundColor(.white.opacity(0.3))
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(isHovered ? Color.white.opacity(0.08) : Color.clear)
+                )
+            }
+            .buttonStyle(.plain)
+            .onHover { isHovered = $0 }
+
+            if isExpanded {
+                VStack(spacing: 0) {
+                    ForEach(options, id: \.id) { option in
+                        Button {
+                            L10n.appLanguage = option.id
+                            current = option.id
+                        } label: {
+                            HStack {
+                                Text(option.label)
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.white.opacity(0.7))
+                                Spacer()
+                                if current == option.id {
+                                    Image(systemName: "checkmark")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundColor(.green)
+                                }
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 6)
+                            .background(Color.white.opacity(0.03))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
     }
 
     private var textColor: Color {
