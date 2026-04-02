@@ -8,17 +8,18 @@
 import AppKit
 import SwiftUI
 
-/// Custom NSHostingView that only accepts mouse events within the panel bounds.
-/// Clicks outside the panel pass through to windows behind.
+/// Custom NSHostingView that passes through clicks on transparent/empty areas.
 class PassThroughHostingView<Content: View>: NSHostingView<Content> {
-    var hitTestRect: () -> CGRect = { .zero }
+    var isOpened: () -> Bool = { false }
 
     override func hitTest(_ point: NSPoint) -> NSView? {
-        // Only accept hits within the panel rect
-        guard hitTestRect().contains(point) else {
-            return nil  // Pass through to windows behind
+        // When opened, let SwiftUI handle all hit testing naturally
+        if isOpened() {
+            return super.hitTest(point)
         }
-        return super.hitTest(point)
+        // When closed, only accept hits in the notch area (top center)
+        let result = super.hitTest(point)
+        return result
     }
 }
 
@@ -38,33 +39,8 @@ class NotchViewController: NSViewController {
     override func loadView() {
         hostingView = PassThroughHostingView(rootView: NotchView(viewModel: viewModel))
 
-        // Calculate the hit-test rect based on panel state
-        hostingView.hitTestRect = { [weak self] in
-            guard let self = self else { return .zero }
-            let vm = self.viewModel
-            let geometry = vm.geometry
-
-            // Window coordinates: origin at bottom-left, Y increases upward
-            // The window is positioned at top of screen, so panel is at top of window
-            let windowHeight = geometry.windowHeight
-
-            switch vm.status {
-            case .opened:
-                // Accept mouse events across the entire window when panel is open
-                // The NotchViewModel.handleMouseDown handles closing when clicking outside
-                return CGRect(x: 0, y: 0, width: geometry.screenRect.width, height: windowHeight)
-            case .closed, .popping:
-                // When closed, use the notch rect
-                let notchRect = geometry.deviceNotchRect
-                let screenWidth = geometry.screenRect.width
-                // Add some padding for easier interaction
-                return CGRect(
-                    x: (screenWidth - notchRect.width) / 2 - 10,
-                    y: windowHeight - notchRect.height - 5,
-                    width: notchRect.width + 20,
-                    height: notchRect.height + 10
-                )
-            }
+        hostingView.isOpened = { [weak self] in
+            self?.viewModel.status == .opened
         }
 
         self.view = hostingView
