@@ -65,7 +65,7 @@ class NotchViewModel: ObservableObject {
     var openedSize: CGSize {
         switch contentType {
         case .chat:
-            // Large size for chat view
+            // Chat view: width fixed, height is max (actual height adapts to content)
             return CGSize(
                 width: min(screenRect.width * 0.5, 600),
                 height: 580

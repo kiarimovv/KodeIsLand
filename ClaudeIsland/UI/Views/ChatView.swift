@@ -53,6 +53,11 @@ struct ChatView: View {
     }
 
     
+    /// Whether the chat has content that needs scrollable space
+    private var hasContent: Bool {
+        !isLoading && !history.isEmpty
+    }
+
     var body: some View {
         ZStack {
             VStack(spacing: 0) {
@@ -89,6 +94,8 @@ struct ChatView: View {
                         .transition(.opacity)
                 }
             }
+            // When no content, shrink to fit; when content exists, fill available space
+            .fixedSize(horizontal: false, vertical: !hasContent)
         }
         .animation(.spring(response: 0.35, dampingFraction: 0.85), value: isWaitingForApproval)
         .animation(nil, value: viewModel.status)
@@ -237,7 +244,8 @@ struct ChatView: View {
                 .font(.system(size: 13, weight: .medium))
                 .foregroundColor(.white.opacity(0.4))
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 20)
     }
 
     // MARK: - Empty State
@@ -251,7 +259,8 @@ struct ChatView: View {
                 .font(.system(size: 13, weight: .medium))
                 .foregroundColor(.white.opacity(0.4))
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 20)
     }
 
     // MARK: - Message List
