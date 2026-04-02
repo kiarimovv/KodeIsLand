@@ -168,9 +168,17 @@ class BuddyReader: ObservableObject {
 
     private static func readSalt() -> String {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
-        let versionsDir = "\(home)/.local/share/claude/versions"
 
-        // Find latest Claude binary
+        // 1. Check cached salt file (written by any-buddy or CodeIsland setup)
+        let cachePath = "\(home)/.claude/.codeisland-salt"
+        if let cached = try? String(contentsOfFile: cachePath, encoding: .utf8),
+           cached.count == originalSalt.count,
+           cached.allSatisfy({ $0.isASCII && !$0.isNewline }) {
+            return cached
+        }
+
+        // 2. Scan Claude binaries for patched salt
+        let versionsDir = "\(home)/.local/share/claude/versions"
         guard let versions = try? FileManager.default.contentsOfDirectory(atPath: versionsDir) else {
             return originalSalt
         }
@@ -181,30 +189,32 @@ class BuddyReader: ObservableObject {
 
         let origBytes = Data(originalSalt.utf8)
 
-        // Check latest version first
         for binary in binaries {
             let binaryPath = "\(versionsDir)/\(binary)"
-            guard let binaryData = try? Data(contentsOf: URL(fileURLWithPath: binaryPath)) else { continue }
 
-            // If original salt found, this version is unpatched — use original
+            // Use mmap for efficient large file scanning
+            guard let binaryData = try? Data(contentsOf: URL(fileURLWithPath: binaryPath), options: .mappedIfSafe) else { continue }
+
             if binaryData.range(of: origBytes) != nil {
                 return originalSalt
             }
 
-            // Binary was patched — extract the patched salt from backup
-            let bakCandidates = ["\(binaryPath).anybuddy-bak", "\(binaryPath).bak"]
-            for bakPath in bakCandidates {
+            // Patched — extract from backup
+            for suffix in [".anybuddy-bak", ".bak"] {
+                let bakPath = binaryPath + suffix
                 guard FileManager.default.fileExists(atPath: bakPath),
-                      let bakData = try? Data(contentsOf: URL(fileURLWithPath: bakPath)),
+                      let bakData = try? Data(contentsOf: URL(fileURLWithPath: bakPath), options: .mappedIfSafe),
                       let range = bakData.range(of: origBytes) else { continue }
                 let offset = range.lowerBound
                 let end = offset + origBytes.count
                 guard end <= binaryData.count else { continue }
                 let patchedBytes = binaryData[offset..<end]
-                if let patchedSalt = String(data: Data(patchedBytes), encoding: .utf8),
-                   patchedSalt.count == originalSalt.count,
-                   patchedSalt.allSatisfy({ $0.isASCII && !$0.isNewline }) {
-                    return patchedSalt
+                if let salt = String(data: Data(patchedBytes), encoding: .utf8),
+                   salt.count == originalSalt.count,
+                   salt.allSatisfy({ $0.isASCII && !$0.isNewline }) {
+                    // Cache for next time
+                    try? salt.write(toFile: cachePath, atomically: true, encoding: .utf8)
+                    return salt
                 }
             }
         }
