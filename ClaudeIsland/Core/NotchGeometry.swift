@@ -26,9 +26,9 @@ struct NotchGeometry: Sendable {
 
     /// The opened panel rect in screen coordinates for a given size
     func openedScreenRect(for size: CGSize) -> CGRect {
-        // Match the actual rendered panel size (tuned to match visual output)
-        let width = size.width - 6
-        let height = size.height - 30
+        // Use full size with generous padding so clicks inside the panel never close it
+        let width = size.width + 20
+        let height = size.height + 20
         return CGRect(
             x: screenRect.midX - width / 2,
             y: screenRect.maxY - height,
