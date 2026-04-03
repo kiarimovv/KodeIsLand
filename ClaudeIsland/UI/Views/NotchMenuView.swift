@@ -114,7 +114,8 @@ struct NotchMenuView: View {
             VersionRow()
         }
         .padding(.horizontal, 8)
-        .padding(.vertical, 8)
+        .padding(.top, 28) // Push below camera module
+        .padding(.bottom, 8)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .onAppear {
             refreshStates()

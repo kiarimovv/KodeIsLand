@@ -46,7 +46,7 @@ struct ClaudeInstancesView: View {
                         .buttonStyle(.plain)
                     }
                     .padding(.horizontal, 10)
-                    .padding(.top, 2)
+                    .padding(.top, 28) // Push below camera module
 
                     if showBuddyCard, let buddy = buddyReader.buddy {
                         buddyCardView(buddy)

@@ -203,7 +203,8 @@ struct ChatView: View {
         .buttonStyle(.plain)
         .onHover { isHeaderHovered = $0 }
         .padding(.horizontal, 8)
-        .padding(.vertical, 4)
+        .padding(.top, 28) // Push content below camera module
+        .padding(.bottom, 4)
         .background(Color.black.opacity(0.2))
         .overlay(alignment: .bottom) {
             LinearGradient(
