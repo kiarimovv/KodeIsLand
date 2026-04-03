@@ -1,54 +1,70 @@
-import { Cat, Zap, ShieldCheck, Monitor, Terminal, Bell } from "lucide-react"
+import { Cat, Zap, ShieldCheck, Monitor, Terminal, Bell, Activity, Globe } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
 const features: { Icon: LucideIcon; title: string; desc: string; ascii: string }[] = [
   {
-    Icon: Cat,
-    ascii: `/\\_/\\
-( o.o )
- > ^ <`,
-    title: "Pixel Cat Companion",
-    desc: "6 animated states that react to your agents. Blinks idle, eyes dart working, waves when it needs you.",
-  },
-  {
-    Icon: Zap,
-    ascii: `  [*]
-  /|\\
- / | \\`,
-    title: "Zero Config",
-    desc: "One launch, done. Auto-installs hooks into Claude Code and starts monitoring all sessions.",
+    Icon: Monitor,
+    ascii: `[● ● ●]
+[  ...  ]
+[_______]`,
+    title: "灵动岛实时监控",
+    desc: "折叠态左右翼显示状态圆点、Buddy 图标、项目名。青色=进行中，绿色=完成，红色=出错。",
   },
   {
     Icon: ShieldCheck,
     ascii: ` [+3 -1]
  ───────
   allow`,
-    title: "Notch Approval",
-    desc: "Approve or deny permissions with full code diff preview, right from the notch.",
+    title: "刘海内审批",
+    desc: "Claude 要权限？代码改了啥一目了然，diff 高亮预览，一键批准或拒绝，不用切窗口。",
   },
   {
-    Icon: Monitor,
-    ascii: `[● ● ●]
-[  ...  ]
-[_______]`,
-    title: "Session Monitor",
-    desc: "See every running Claude Code session — tool calls, duration, status — at a glance.",
+    Icon: Activity,
+    ascii: `5h 74%
+7d 89%
+ ████`,
+    title: "智能摘要 + 用量统计",
+    desc: "不用展开就能看到 Claude 在聊什么。实时显示 API 用量，帮你盯着额度别超了。",
   },
   {
     Icon: Terminal,
     ascii: `  > _
- cmux
+ jump!
   > _`,
-    title: "Terminal Jump",
-    desc: "Jump to the exact terminal tab and split pane. Works with cmux, iTerm2, and more.",
+    title: "一键跳转终端",
+    desc: "自动识别 Ghostty、iTerm2、Warp、Terminal 等十几种终端，精确跳到对应标签页。",
+  },
+  {
+    Icon: Cat,
+    ascii: `/\\_/\\
+( o.o )
+ > ^ <`,
+    title: "Buddy 宠物 + 像素猫",
+    desc: "你的 Claude Buddy 住在刘海里，18 种物种 ASCII 动画。还有手绘像素猫 6 种表情状态。",
   },
   {
     Icon: Bell,
     ascii: `  .-.
  | ! |
   '-'`,
-    title: "Sound Alerts",
-    desc: "8-bit synthesized sounds for every event. Import custom sound packs or craft your own.",
+    title: "8-bit 音效 + 无人值守告警",
+    desc: "每个事件专属芯片音提醒。超过 30 秒未处理变橙色，60 秒变红色，离开工位也放心。",
+  },
+  {
+    Icon: Zap,
+    ascii: `  [*]
+  /|\\
+ / | \\`,
+    title: "零配置即用",
+    desc: "启动一次，自动安装 hooks。不用改配置文件，不用装额外依赖。",
+  },
+  {
+    Icon: Globe,
+    ascii: ` 中/EN
+ ─────
+  auto`,
+    title: "中英双语",
+    desc: "跟随系统语言自动切换，也可以在设置里手动选择。",
   },
 ]
 
@@ -62,13 +78,13 @@ export default function Features() {
           style={{ animation: 'heroEnter 0.8s ease-out both' }}
           className="text-center mb-20"
         >
-          <span className="font-mono text-xs text-green uppercase tracking-[0.3em]">capabilities</span>
+          <span className="font-mono text-xs text-green uppercase tracking-[0.3em]">功能特性</span>
           <h2 className="font-display text-4xl sm:text-5xl font-extrabold text-text-primary mt-4">
-            Everything in the notch
+            全部塞进刘海里
           </h2>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {features.map((f, i) => (
             <div
               key={f.title}

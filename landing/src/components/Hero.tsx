@@ -34,9 +34,9 @@ export default function Hero() {
           </div>
 
           <h1 className="font-display text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-extrabold tracking-tight leading-[0.95]">
-            <span className="text-text-primary">Dynamic Island</span>
+            <span className="text-text-primary">MacBook 灵动岛</span>
             <br />
-            <span className="text-text-primary">for your </span>
+            <span className="text-text-primary">变身 </span>
             <span
               className="text-transparent bg-clip-text"
               style={{
@@ -45,14 +45,14 @@ export default function Hero() {
                 animation: 'gradient-shift 5s ease-in-out infinite',
               }}
             >
-              Claude Code
+              AI 指挥台
             </span>
           </h1>
 
           <p className="text-base sm:text-lg text-text-muted mt-6 max-w-xl mx-auto leading-relaxed">
-            Stay in flow while your agents keep working.
+            让你的刘海不再浪费。
             <br />
-            Monitor, approve, and jump back — right from the notch.
+            实时监控 Claude Code 会话、一键审批、秒回终端。
           </p>
 
           {/* CTA */}
@@ -62,14 +62,14 @@ export default function Hero() {
               className="group flex items-center gap-2.5 bg-green text-deep px-8 py-3.5 rounded-xl font-mono text-sm font-bold transition-all duration-300 hover:shadow-[0_0_40px_rgba(52,211,153,0.3)] hover:scale-[1.03]"
             >
               <Apple size={16} />
-              Download for Free
+              免费下载
             </a>
             <a
               href="https://github.com/xmqywx/CodeIsland"
               className="group flex items-center gap-2.5 glass px-8 py-3.5 rounded-xl font-mono text-sm text-purple-pale transition-all duration-300 hover:scale-[1.03] hover:text-text-primary"
             >
               <GithubIcon size={16} />
-              Star on GitHub
+              GitHub Star
             </a>
           </div>
         </div>

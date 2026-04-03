@@ -29,13 +29,18 @@ export default function Navbar() {
 
         <div className="flex items-center gap-8">
           <div className="hidden md:flex items-center gap-6 text-sm text-text-muted">
-            {["Demo", "Features", "How it Works", "GitHub"].map((item) => (
+            {[
+              { label: "演示", href: "#demo" },
+              { label: "功能", href: "#features" },
+              { label: "快速上手", href: "#how-it-works" },
+              { label: "GitHub", href: "https://github.com/xmqywx/CodeIsland" },
+            ].map((item) => (
               <a
-                key={item}
-                href={`#${item.toLowerCase().replace(/ /g, "-")}`}
+                key={item.label}
+                href={item.href}
                 className="hover:text-text-primary transition-colors relative after:absolute after:bottom-0 after:left-0 after:w-0 after:h-px after:bg-green after:transition-all hover:after:w-full"
               >
-                {item}
+                {item.label}
               </a>
             ))}
           </div>
@@ -44,7 +49,7 @@ export default function Navbar() {
             className="flex items-center gap-2 bg-green/10 text-green border border-green/20 px-4 py-2 rounded-lg text-sm font-medium hover:bg-green/20 hover:border-green/30 transition-all"
           >
             <Download size={14} />
-            Download
+            下载
           </a>
         </div>
       </div>

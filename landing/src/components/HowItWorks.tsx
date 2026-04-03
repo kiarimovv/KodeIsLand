@@ -4,23 +4,23 @@ const steps = [
   {
     Icon: Download,
     num: "01",
-    cmd: "brew install --cask codeisland",
-    title: "Install",
-    desc: "One command. Or drag the .app to Applications.",
+    cmd: "# 下载 DMG 拖到应用程序",
+    title: "安装",
+    desc: "从 GitHub Releases 下载 DMG，拖到应用程序文件夹即可。",
   },
   {
     Icon: Rocket,
     num: "02",
-    cmd: "# auto-configures Claude Code hooks",
-    title: "Launch",
-    desc: "CodeIsland detects your setup and installs hooks. No config files to edit.",
+    cmd: "# 自动配置 Claude Code hooks",
+    title: "启动",
+    desc: "CodeIsland 自动检测你的环境并安装 hooks，无需手动编辑任何配置文件。",
   },
   {
     Icon: Zap,
     num: "03",
-    cmd: "# monitor → approve → jump → flow",
-    title: "Flow",
-    desc: "Monitor, approve, and jump back — all from the notch. Never break your focus.",
+    cmd: "# 监控 → 审批 → 跳转 → 心流",
+    title: "专注",
+    desc: "监控、审批、跳回终端——全在刘海里完成。再也不用切窗口打断思路。",
   },
 ]
 
@@ -34,9 +34,9 @@ export default function HowItWorks() {
           style={{ animation: 'heroEnter 0.8s ease-out both' }}
           className="text-center mb-20"
         >
-          <span className="font-mono text-xs text-green uppercase tracking-[0.3em]">getting started</span>
+          <span className="font-mono text-xs text-green uppercase tracking-[0.3em]">快速上手</span>
           <h2 className="font-display text-4xl sm:text-5xl font-extrabold text-text-primary mt-4">
-            Three steps to flow
+            三步开始
           </h2>
         </div>
 

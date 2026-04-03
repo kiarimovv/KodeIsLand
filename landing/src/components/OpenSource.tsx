@@ -50,19 +50,20 @@ export default function OpenSource() {
         >
           {/* ASCII flag with glow */}
           <pre className="font-mono text-sm text-green leading-snug inline-block mb-8 font-bold glow-green select-none">
-{`   +===+
-   |MIT|
-   +===+
+{`   +====+
+   | CC |
+   +====+
     |||
 ~~~~|||~~~~`}
           </pre>
 
           <h2 className="font-display text-4xl sm:text-5xl font-extrabold text-text-primary">
-            Open Source &<br />Free Forever
+            开源免费
           </h2>
           <p className="text-base text-text-muted mt-4 max-w-lg mx-auto leading-relaxed">
-            CodeIsland is MIT licensed. Use it, fork it, improve it.
-            Built with the community, for the community.
+            CodeIsland 基于 CC BY-NC 4.0 协议开源。个人免费使用，代码透明可审查。
+            <br />
+            和社区一起构建，为社区服务。
           </p>
         </div>
 
@@ -93,7 +94,7 @@ export default function OpenSource() {
           >
             <Heart size={14} className="text-red-400" />
             <span className="font-mono text-sm text-text-primary font-bold">{contributors}</span>
-            <span className="font-mono text-xs text-text-muted">Contributors</span>
+            <span className="font-mono text-xs text-text-muted">贡献者</span>
           </a>
         </div>
 
@@ -107,14 +108,14 @@ export default function OpenSource() {
             className="flex items-center gap-2.5 bg-green text-deep px-8 py-3.5 rounded-xl font-mono text-sm font-bold transition-all duration-300 hover:shadow-[0_0_40px_rgba(52,211,153,0.3)] hover:scale-105"
           >
             <GitFork size={16} />
-            Fork & Contribute
+            Fork & 参与贡献
           </a>
           <a
             href={`https://github.com/${REPO}#readme`}
             className="flex items-center gap-2.5 glass px-8 py-3.5 rounded-xl font-mono text-sm text-purple-pale transition-all duration-300 hover:scale-105 hover:text-text-primary"
           >
             <GithubIcon size={16} />
-            Read the Docs
+            查看文档
           </a>
         </div>
       </div>

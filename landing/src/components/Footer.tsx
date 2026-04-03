@@ -21,7 +21,7 @@ export default function Footer() {
           <img src={logo} alt="CodeIsland" className="w-5 h-5 rounded" />
           <span className="font-mono text-xs font-bold text-text-muted tracking-[0.15em]">CODEISLAND</span>
           <span className="text-text-muted/40 mx-1">·</span>
-          <span className="font-mono text-xs text-text-muted/60">MIT License</span>
+          <span className="font-mono text-xs text-text-muted/60">CC BY-NC 4.0</span>
         </a>
 
         <div className="flex items-center gap-5">
