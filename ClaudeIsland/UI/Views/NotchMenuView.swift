@@ -23,178 +23,167 @@ struct NotchMenuView: View {
     @State private var hooksInstalled: Bool = false
     @State private var launchAtLogin: Bool = false
 
-    var body: some View {
-        VStack(spacing: 4) {
-            // Back button
-            MenuRow(
-                icon: "chevron.left",
-                label: L10n.back
-            ) {
-                viewModel.toggleMenu()
+    // MARK: - Compact Toggle
+    private func compactToggle(icon: String, label: String, isOn: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.system(size: 9))
+                    .foregroundColor(.white.opacity(0.5))
+                    .frame(width: 12)
+                Text(label)
+                    .font(.system(size: 10))
+                    .foregroundColor(.white.opacity(0.7))
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+                Circle()
+                    .fill(isOn ? TerminalColors.green : Color.white.opacity(0.2))
+                    .frame(width: 5, height: 5)
             }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .background(RoundedRectangle(cornerRadius: 6).fill(Color.white.opacity(0.04)))
+        }
+        .buttonStyle(.plain)
+    }
 
-            Divider()
-                .background(Color.white.opacity(0.08))
-                .padding(.vertical, 4)
-
-            // Appearance settings
-            ScreenPickerRow(screenSelector: screenSelector)
-            SoundPickerRow(soundSelector: soundSelector)
-
-            MenuToggleRow(
-                icon: "folder",
-                label: L10n.groupByProject,
-                isOn: showGrouped
-            ) {
-                showGrouped.toggle()
-            }
-
-            MenuToggleRow(
-                icon: "cat",
-                label: "Pixel Cat Mode",
-                isOn: usePixelCat
-            ) {
-                usePixelCat.toggle()
-            }
-
-            MenuToggleRow(
-                icon: "eye.slash",
-                label: L10n.smartSuppression,
-                isOn: smartSuppression
-            ) {
-                smartSuppression.toggle()
-            }
-
-            MenuToggleRow(
-                icon: "rectangle.compress.vertical",
-                label: L10n.autoCollapseOnMouseLeave,
-                isOn: autoCollapseOnMouseLeave
-            ) {
-                autoCollapseOnMouseLeave.toggle()
-            }
-
-            // Language picker
-            LanguageRow()
-
-            Divider()
-                .background(Color.white.opacity(0.08))
-                .padding(.vertical, 4)
-
-            // System settings
-            MenuToggleRow(
-                icon: "power",
-                label: L10n.launchAtLogin,
-                isOn: launchAtLogin
-            ) {
-                do {
-                    if launchAtLogin {
-                        try SMAppService.mainApp.unregister()
-                        launchAtLogin = false
-                    } else {
-                        try SMAppService.mainApp.register()
-                        launchAtLogin = true
-                    }
-                } catch {
-                    print("Failed to toggle launch at login: \(error)")
-                }
-            }
-
-            MenuToggleRow(
-                icon: "arrow.triangle.2.circlepath",
-                label: L10n.hooks,
-                isOn: hooksInstalled
-            ) {
-                if hooksInstalled {
-                    HookInstaller.uninstall()
-                    hooksInstalled = false
-                } else {
-                    HookInstaller.installIfNeeded()
-                    hooksInstalled = true
-                }
-            }
-
-            AccessibilityRow(isEnabled: AXIsProcessTrusted())
-
-            Divider()
-                .background(Color.white.opacity(0.08))
-                .padding(.vertical, 4)
-
-            // Star & Feedback
-            HStack(spacing: 8) {
-                // Star button
-                Button {
-                    NSWorkspace.shared.open(URL(string: "https://github.com/xmqywx/CodeIsland")!)
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "star.fill")
-                            .font(.system(size: 11))
-                            .foregroundColor(.yellow)
-                        Text("Star")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(.white.opacity(0.7))
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(Color.yellow.opacity(0.1))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .strokeBorder(Color.yellow.opacity(0.2), lineWidth: 0.5)
-                            )
-                    )
-                }
-                .buttonStyle(.plain)
-
-                // Feedback button
-                Button {
-                    NSWorkspace.shared.open(URL(string: "https://github.com/xmqywx/CodeIsland/issues")!)
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "bubble.left.and.bubble.right")
-                            .font(.system(size: 11))
-                            .foregroundColor(.white.opacity(0.5))
-                        Text(L10n.tr("Feedback", "反馈"))
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(.white.opacity(0.7))
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(Color.white.opacity(0.06))
-                    )
-                }
-                .buttonStyle(.plain)
-            }
-            .frame(maxWidth: .infinity)
-
-            Text(L10n.tr("Actively maintained · Your star keeps us going!", "持续更新中 · 你的 Star 是我们最大的动力！"))
-                .font(.system(size: 9))
-                .foregroundColor(.white.opacity(0.2))
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity)
-                .padding(.top, 2)
-
-            Divider()
-                .background(Color.white.opacity(0.08))
-                .padding(.vertical, 4)
-
-            // Quit
-            MenuRow(
-                icon: "xmark.circle",
-                label: L10n.quit,
-                isDestructive: true
-            ) {
-                NSApplication.shared.terminate(nil)
-            }
-
-            // About
-            VersionRow()
+    // MARK: - Section Header
+    private func sectionHeader(_ title: String) -> some View {
+        HStack {
+            Text(title)
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundColor(.white.opacity(0.25))
+                .textCase(.uppercase)
+            Spacer()
         }
         .padding(.horizontal, 8)
-        .padding(.top, 28) // Push below camera module
-        .padding(.bottom, 8)
+        .padding(.top, 6)
+        .padding(.bottom, 2)
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header: back + quit
+            HStack {
+                Button {
+                    viewModel.toggleMenu()
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 10))
+                        Text(L10n.back)
+                            .font(.system(size: 11, weight: .medium))
+                    }
+                    .foregroundColor(.white.opacity(0.6))
+                }
+                .buttonStyle(.plain)
+
+                Spacer()
+
+                Button {
+                    NSApplication.shared.terminate(nil)
+                } label: {
+                    Text(L10n.quit)
+                        .font(.system(size: 10))
+                        .foregroundColor(Color(red: 1.0, green: 0.4, blue: 0.4).opacity(0.7))
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, 8)
+            .padding(.bottom, 4)
+
+            // Scrollable settings
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(spacing: 2) {
+                    // Appearance
+                    sectionHeader(L10n.tr("Appearance", "外观"))
+                    ScreenPickerRow(screenSelector: screenSelector)
+                    SoundPickerRow(soundSelector: soundSelector)
+                    LanguageRow()
+
+                    // Toggle grid — 2 columns
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 4) {
+                        compactToggle(icon: "cat", label: "Pixel Cat", isOn: usePixelCat) { usePixelCat.toggle() }
+                        compactToggle(icon: "folder", label: L10n.groupByProject, isOn: showGrouped) { showGrouped.toggle() }
+                        compactToggle(icon: "eye.slash", label: L10n.smartSuppression, isOn: smartSuppression) { smartSuppression.toggle() }
+                        compactToggle(icon: "rectangle.compress.vertical", label: L10n.autoCollapseOnMouseLeave, isOn: autoCollapseOnMouseLeave) { autoCollapseOnMouseLeave.toggle() }
+                    }
+                    .padding(.horizontal, 4)
+
+                    // System
+                    sectionHeader(L10n.tr("System", "系统"))
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 4) {
+                        compactToggle(icon: "power", label: L10n.launchAtLogin, isOn: launchAtLogin) {
+                            do {
+                                if launchAtLogin {
+                                    try SMAppService.mainApp.unregister()
+                                    launchAtLogin = false
+                                } else {
+                                    try SMAppService.mainApp.register()
+                                    launchAtLogin = true
+                                }
+                            } catch {}
+                        }
+                        compactToggle(icon: "arrow.triangle.2.circlepath", label: L10n.hooks, isOn: hooksInstalled) {
+                            if hooksInstalled {
+                                HookInstaller.uninstall()
+                                hooksInstalled = false
+                            } else {
+                                HookInstaller.installIfNeeded()
+                                hooksInstalled = true
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 4)
+
+                    AccessibilityRow(isEnabled: AXIsProcessTrusted())
+
+                    // Star & Feedback
+                    HStack(spacing: 6) {
+                        Button {
+                            NSWorkspace.shared.open(URL(string: "https://github.com/xmqywx/CodeIsland")!)
+                        } label: {
+                            HStack(spacing: 3) {
+                                Image(systemName: "star.fill").font(.system(size: 9)).foregroundColor(.yellow)
+                                Text("Star").font(.system(size: 10, weight: .medium)).foregroundColor(.white.opacity(0.7))
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 5)
+                            .background(RoundedRectangle(cornerRadius: 6).fill(Color.yellow.opacity(0.08)).overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color.yellow.opacity(0.15), lineWidth: 0.5)))
+                        }
+                        .buttonStyle(.plain)
+
+                        Button {
+                            NSWorkspace.shared.open(URL(string: "https://github.com/xmqywx/CodeIsland/issues")!)
+                        } label: {
+                            HStack(spacing: 3) {
+                                Image(systemName: "bubble.left").font(.system(size: 9)).foregroundColor(.white.opacity(0.4))
+                                Text(L10n.tr("Feedback", "反馈")).font(.system(size: 10, weight: .medium)).foregroundColor(.white.opacity(0.7))
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 5)
+                            .background(RoundedRectangle(cornerRadius: 6).fill(Color.white.opacity(0.05)))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding(.horizontal, 4)
+                    .padding(.top, 6)
+
+                    VersionRow()
+
+                    Text(L10n.tr("Actively maintained · Your star keeps us going!\nHave ideas? Tap Feedback — we'd love to hear from you!", "持续更新中 · Star 是我们最大的动力！\n有好的想法？点击反馈告诉我们，期待下个版本见！"))
+                        .font(.system(size: 8))
+                        .foregroundColor(.white.opacity(0.15))
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 2)
+                }
+                .padding(.horizontal, 4)
+                .padding(.bottom, 8)
+            }
+        }
+        .padding(.top, 20)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .onAppear {
             refreshStates()

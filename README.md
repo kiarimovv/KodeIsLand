@@ -207,6 +207,17 @@ I will personally review and merge all PRs. Please keep changes focused and incl
 
 我会亲自 Review 并合并所有 PR。请保持改动聚焦，附上清晰的说明。
 
+## Contact / 联系方式
+
+Have questions or want to chat? Reach out!
+
+有问题或想交流？欢迎联系！
+
+- **WeChat / 微信**: `A115939`
+- **Phone / 手机**: `13884635775`
+
+<img src="docs/wechat-qr.jpg" width="200" alt="WeChat QR Code" />
+
 ## Credits
 
 Forked from [Claude Island](https://github.com/farouqaldori/claude-island) by farouqaldori. Rebuilt with pixel cat animations, buddy integration, cmux support, i18n, and minimal glow-dot design.
