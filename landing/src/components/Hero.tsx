@@ -1,6 +1,6 @@
-import { Apple } from "lucide-react"
 import { MacbookScroll } from "@/components/ui/macbook-scroll"
 import MacScreenContent from "./MacScreenContent"
+import { useI18n } from "../lib/i18n"
 import logo from "../lib/logo"
 
 const GithubIcon = ({ size = 16 }: { size?: number }) => (
@@ -10,6 +10,8 @@ const GithubIcon = ({ size = 16 }: { size?: number }) => (
 )
 
 export default function Hero() {
+  const { t } = useI18n()
+
   return (
     <div className="w-full bg-deep relative z-10 isolate">
       <MacbookScroll
@@ -17,10 +19,10 @@ export default function Hero() {
           <div className="flex flex-col items-center gap-6">
             <img src={logo} alt="CodeIsland" className="w-14 h-14 rounded-2xl shadow-lg" style={{ animation: 'heroEnter 1s ease-out both' }} />
 
-            <h1 className="font-display text-5xl sm:text-6xl md:text-7xl font-extrabold tracking-tight leading-[0.95] text-center" style={{ animation: 'heroEnter 1s ease-out 0.1s both' }}>
-              <span className="text-text-primary">Dynamic Island</span>
+            <h1 className="font-display text-4xl sm:text-5xl md:text-7xl font-extrabold tracking-tight leading-[0.95] text-center" style={{ animation: 'heroEnter 1s ease-out 0.1s both' }}>
+              <span className="text-text-primary">{t("hero.title1")}</span>
               <br />
-              <span className="text-text-primary">for your </span>
+              <span className="text-text-primary">{t("hero.title2")}</span>
               <span
                 className="text-transparent bg-clip-text"
                 style={{
@@ -29,30 +31,29 @@ export default function Hero() {
                   animation: 'gradient-shift 5s ease-in-out infinite',
                 }}
               >
-                Claude Code
+                {t("hero.title3")}
               </span>
             </h1>
 
-            <p className="text-base sm:text-lg text-text-muted max-w-xl mx-auto leading-relaxed text-center" style={{ animation: 'heroEnter 1s ease-out 0.2s both' }}>
-              Stay in flow while your agents keep working.
+            <p className="text-sm sm:text-base sm:text-lg text-text-muted max-w-xl mx-auto leading-relaxed text-center px-4" style={{ animation: 'heroEnter 1s ease-out 0.2s both' }}>
+              {t("hero.subtitle1")}
               <br />
-              Monitor, approve, and jump back — right from the notch.
+              {t("hero.subtitle2")}
             </p>
 
-            <div className="flex flex-wrap gap-4 justify-center" style={{ animation: 'heroEnter 1s ease-out 0.3s both' }}>
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center px-4 sm:px-0" style={{ animation: 'heroEnter 1s ease-out 0.3s both' }}>
               <a
                 href="https://github.com/xmqywx/CodeIsland/releases"
-                className="group flex items-center gap-2.5 bg-green text-deep px-8 py-3.5 rounded-xl font-mono text-sm font-bold transition-all duration-300 hover:shadow-[0_0_40px_rgba(52,211,153,0.3)] hover:scale-[1.03]"
+                className="group flex items-center justify-center gap-2.5 bg-green text-deep px-8 py-3.5 rounded-xl font-mono text-sm font-bold transition-all duration-300 hover:shadow-[0_0_40px_rgba(52,211,153,0.3)] hover:scale-[1.03]"
               >
-                <Apple size={16} />
-                Download for Free
+                {t("hero.download")}
               </a>
               <a
                 href="https://github.com/xmqywx/CodeIsland"
-                className="group flex items-center gap-2.5 glass px-8 py-3.5 rounded-xl font-mono text-sm text-purple-pale transition-all duration-300 hover:scale-[1.03] hover:text-text-primary"
+                className="group flex items-center justify-center gap-2.5 glass px-8 py-3.5 rounded-xl font-mono text-sm text-purple-pale transition-all duration-300 hover:scale-[1.03] hover:text-text-primary"
               >
                 <GithubIcon size={16} />
-                Star on GitHub
+                {t("hero.star")}
               </a>
             </div>
           </div>

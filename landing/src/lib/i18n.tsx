@@ -71,6 +71,26 @@ const translations = {
   "os.fork": { zh: "Fork & 参与贡献", en: "Fork & Contribute" },
   "os.docs": { zh: "查看文档", en: "Read the Docs" },
 
+  // NotchDemo internal
+  "demo.activeSessions": { zh: "2 个活跃会话", en: "2 active sessions" },
+  "demo.permissionRequest": { zh: "权限请求", en: "Permission Request" },
+  "demo.allow": { zh: "允许", en: "Allow" },
+  "demo.deny": { zh: "拒绝", en: "Deny" },
+  "demo.claudeAsking": { zh: "Claude 在问你", en: "Claude is asking" },
+  "demo.claudeQuestion": { zh: "要不要同时更新 refresh token 逻辑来匹配新的认证方式？", en: "Should I also update the refresh token logic to match the new auth pattern?" },
+  "demo.yes": { zh: "好的", en: "Yes" },
+  "demo.no": { zh: "不用", en: "No" },
+  "demo.jumpToTerminal": { zh: "跳转到终端", en: "Jumping to terminal" },
+  "demo.active": { zh: "活跃", en: "active" },
+  "demo.monitorTitle": { zh: "实时监控所有会话", en: "Monitor all sessions" },
+  "demo.monitorSub": { zh: "一眼看到所有 Agent 的状态——工具调用、运行时长实时更新。", en: "See every running agent at a glance — status, tool calls, duration." },
+  "demo.approveTitle": { zh: "不切窗口直接审批", en: "Approve without switching" },
+  "demo.approveSub": { zh: "代码 diff 预览，允许或拒绝——全在刘海里完成。", en: "Review code diffs and allow or deny — right from the notch." },
+  "demo.askTitle": { zh: "在刘海里回答问题", en: "Answer from the notch" },
+  "demo.askSub": { zh: "Agent 需要你的输入？选一个选项继续推进。", en: "When an agent needs input, pick an option and keep moving." },
+  "demo.jumpTitle": { zh: "跳转到对应终端", en: "Jump to the right terminal" },
+  "demo.jumpSub": { zh: "一键跳到对应的终端标签页和分屏。", en: "One click to the exact tab and split pane in cmux or iTerm2." },
+
   // Footer
   "footer.madeWith": { zh: "Made with", en: "Made with" },
 } as const
