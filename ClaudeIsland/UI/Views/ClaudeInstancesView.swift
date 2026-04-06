@@ -25,61 +25,60 @@ struct ClaudeInstancesView: View {
         if sessionMonitor.instances.isEmpty {
             emptyState
         } else {
-            ZStack(alignment: .bottomTrailing) {
-                VStack(spacing: 0) {
-                    // Top bar: session count + settings
-                    HStack {
-                        Text("\(sessionMonitor.instances.count) \(L10n.sessions)")
-                            .font(.system(size: 11))
-                            .foregroundColor(.white.opacity(0.25))
-                        Spacer()
-                        Button {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                viewModel.toggleMenu()
-                            }
-                        } label: {
-                            Image(systemName: "gearshape")
-                                .font(.system(size: 10))
-                                .foregroundColor(.white.opacity(0.35))
-                                .frame(width: 24, height: 24)
-                                .contentShape(Rectangle())
+            VStack(spacing: 0) {
+                // Top bar: session count + settings
+                HStack {
+                    Text("\(sessionMonitor.instances.count) \(L10n.sessions)")
+                        .font(.system(size: 11))
+                        .foregroundColor(.white.opacity(0.25))
+                    Spacer()
+                    Button {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            viewModel.toggleMenu()
                         }
-                        .buttonStyle(.plain)
+                    } label: {
+                        Image(systemName: "gearshape")
+                            .font(.system(size: 10))
+                            .foregroundColor(.white.opacity(0.35))
+                            .frame(width: 24, height: 24)
+                            .contentShape(Rectangle())
                     }
-                    .padding(.horizontal, 10)
-                    .padding(.top, 6)
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 10)
+                .padding(.top, 6)
 
-                    if showBuddyCard, let buddy = buddyReader.buddy {
-                        buddyCardView(buddy)
-                    } else if showGrouped {
-                        groupedList
-                    } else {
-                        flatList
-                    }
+                if showBuddyCard, let buddy = buddyReader.buddy {
+                    buddyCardView(buddy)
+                } else if showGrouped {
+                    groupedList
+                } else {
+                    flatList
                 }
 
-                // Bottom right: buddy + usage stats
-                // Hidden when buddy card open or when expanded with many sessions
+                // Bottom: buddy + usage stats (below the list, not overlapping)
                 if !showBuddyCard && !(sortedInstances.count > 4 && viewModel.isInstancesExpanded) {
-                    VStack(alignment: .trailing, spacing: 4) {
-                        // Only show buddy when ≤ 5 sessions
-                        if sortedInstances.count <= 5, let buddy = buddyReader.buddy {
-                            Button {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                    showBuddyCard.toggle()
+                    HStack {
+                        Spacer()
+                        VStack(alignment: .trailing, spacing: 4) {
+                            if sortedInstances.count <= 5, let buddy = buddyReader.buddy {
+                                Button {
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                        showBuddyCard.toggle()
+                                    }
+                                } label: {
+                                    BuddyASCIIView(buddy: buddy)
+                                        .frame(width: 70, height: 40)
+                                        .scaleEffect(0.6)
                                 }
-                            } label: {
-                                BuddyASCIIView(buddy: buddy)
-                                    .frame(width: 80, height: 50)
-                                    .scaleEffect(0.7)
+                                .buttonStyle(.plain)
                             }
-                            .buttonStyle(.plain)
-                        }
 
-                        UsageStatsBar(monitor: rateLimitMonitor, totalMinutes: totalSessionMinutes)
+                            UsageStatsBar(monitor: rateLimitMonitor, copilotMonitor: copilotMonitor, totalMinutes: totalSessionMinutes)
+                        }
+                        .padding(.trailing, 4)
+                        .padding(.bottom, 2)
                     }
-                    .padding(.trailing, 4)
-                    .padding(.bottom, 2)
                     .transition(.opacity.combined(with: .scale(scale: 0.9)))
                 }
             }
@@ -238,7 +237,7 @@ struct ClaudeInstancesView: View {
                     .multilineTextAlignment(.center)
 
                 // Usage stats if available
-                UsageStatsBar(monitor: rateLimitMonitor, totalMinutes: 0)
+                UsageStatsBar(monitor: rateLimitMonitor, copilotMonitor: copilotMonitor, totalMinutes: 0)
                     .padding(.top, 4)
             }
 
@@ -274,6 +273,7 @@ struct ClaudeInstancesView: View {
     }
 
     @StateObject private var rateLimitMonitor = RateLimitMonitor.shared
+    @StateObject private var copilotMonitor = CopilotQuotaMonitor.shared
 
     // MARK: - Instances List
 
@@ -1312,6 +1312,7 @@ struct SubagentListView: View {
 
 struct UsageStatsBar: View {
     @ObservedObject var monitor: RateLimitMonitor
+    @ObservedObject var copilotMonitor: CopilotQuotaMonitor
     let totalMinutes: Int
 
     @State private var appear = false
@@ -1380,6 +1381,25 @@ struct UsageStatsBar: View {
                     .contentShape(Rectangle().size(width: 16, height: 16))
                     .onTapGesture {
                         Task { await monitor.refresh() }
+                    }
+            }
+
+            // Copilot quota (shown when opencode is in use and token is available)
+            if let copilot = copilotMonitor.quotaInfo {
+                Rectangle()
+                    .fill(.white.opacity(0.08))
+                    .frame(width: 1, height: 14)
+
+                copilotGauge(info: copilot)
+
+                Image(systemName: "arrow.clockwise")
+                    .font(.system(size: 7))
+                    .foregroundColor(.white.opacity(copilotMonitor.isLoading ? 0.5 : 0.2))
+                    .rotationEffect(.degrees(copilotMonitor.isLoading ? 360 : 0))
+                    .animation(copilotMonitor.isLoading ? .linear(duration: 1).repeatForever(autoreverses: false) : .default, value: copilotMonitor.isLoading)
+                    .contentShape(Rectangle().size(width: 16, height: 16))
+                    .onTapGesture {
+                        Task { await copilotMonitor.refresh() }
                     }
             }
         }
@@ -1464,5 +1484,35 @@ struct UsageStatsBar: View {
             timeStr = "\(Int(remaining / 86400))天"
         }
         return "\(window)窗口: \(pct)% (\(timeStr)后重置)"
+    }
+
+    @ViewBuilder
+    private func copilotGauge(info: CopilotQuotaInfo) -> some View {
+        let color = info.color
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 3) {
+                // "⬡" or "CP" label to signal Copilot
+                Text("CP")
+                    .font(.system(size: 7, weight: .bold))
+                    .foregroundColor(.white.opacity(0.3))
+                Text(info.displayText)
+                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                    .foregroundColor(color)
+            }
+
+            if let used = info.premiumUsed, let limit = info.premiumLimit, limit > 0 {
+                // Progress bar (premium requests)
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(.white.opacity(0.06))
+                        .frame(width: 50, height: 3)
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(color)
+                        .frame(width: max(2, 50 * CGFloat(used) / CGFloat(limit)), height: 3)
+                        .shadow(color: color.opacity(0.4), radius: 2)
+                }
+            }
+        }
+        .help(info.tooltip)
     }
 }
