@@ -2,160 +2,134 @@
 
 <img src="ClaudeIsland/Assets.xcassets/AppIcon.appiconset/icon_128x128.png" width="128" height="128" alt="CodeIsland" />
 
-# CodeIsland
+# CodeIsland (个人修改版)
 
-**Your AI agents live in the notch.**
+**基于 [xmqywx/CodeIsland](https://github.com/xmqywx/CodeIsland) 的个人修改版本，仅供自用。**
 
-This is a passion project built purely out of personal interest. It is **free and open-source** with no commercial intentions whatsoever. I welcome everyone to try it out, report bugs, share it with your colleagues, and contribute code. Let's build something great together!
-
-这是一个纯粹出于个人兴趣开发的项目，**完全免费开源**，没有任何商业目的。欢迎大家试用、提 Bug、推荐给身边的同事使用，也欢迎贡献代码。一起把它做得更好！
-
-English | [中文](README.zh-CN.md)
-
-[![GitHub stars](https://img.shields.io/github/stars/kiarimovv/KodeIsLand?style=social)](https://github.com/kiarimovv/KodeIsLand/stargazers)
-
-[![Release](https://img.shields.io/github/v/release/kiarimovv/KodeIsLand?style=flat-square&color=4ADE80)](https://github.com/kiarimovv/KodeIsLand/releases)
-[![macOS](https://img.shields.io/badge/macOS-14%2B-black?style=flat-square&logo=apple)](https://github.com/kiarimovv/KodeIsLand/releases)
-[![License](https://img.shields.io/badge/license-CC%20BY--NC%204.0-green?style=flat-square)](LICENSE.md)
-
-**If you find this useful, please give it a star! It keeps us motivated to improve.**
-
-**如果觉得好用，请点个 Star 支持一下！这是我们持续更新的最大动力。**
+原项目是一个将 MacBook 刘海屏变成 AI 编程助手实时控制面板的 macOS 原生应用。
+本仓库在原版基础上做了若干功能增强和体验优化，主要围绕 **OpenCode 支持**、**会话管理**、**直接输入增强** 等方面。
 
 </div>
 
 ---
 
-A native macOS app that turns your MacBook's notch into a real-time control surface for AI coding agents. Monitor sessions, approve permissions, jump to terminals, chat directly — all without leaving your flow.
+## 原版项目
 
-## Features
+- **原版仓库**: [https://github.com/xmqywx/CodeIsland](https://github.com/xmqywx/CodeIsland)
+- **原作者**: [xmqywx](https://github.com/xmqywx)
+- **协议**: CC BY-NC 4.0
 
-### Dynamic Island Notch
+感谢原作者的优秀工作，本修改版完全基于原版开发。
 
-The collapsed notch shows everything at a glance:
+---
 
-- **Animated buddy** — your Claude Code `/buddy` pet rendered as 16x16 pixel art
-- **Status dot** — color indicates state:
-  - 🟦 Cyan = working
-  - 🟧 Amber = needs approval
-  - 🟩 Green = done / waiting for input
-  - 🟣 Purple = thinking
-  - 🔴 Red = error, or session unattended >60s
-  - 🟠 Orange = session unattended >30s
-- **Project name + status** — carousel rotates task title, tool action, project name
-- **Session count** — `×3` badge showing active sessions
+## 相比原版的修改内容
 
-### Session List
+### 新增功能
 
-Expand the notch to see all your sessions:
+#### OpenCode 一级支持
+- 自动检测 OpenCode 会话（session ID `ses_` 前缀识别）
+- **OC** 紫色标签 / **CC** 蓝色标签区分会话来源
+- 自动安装 `codeisland-opencode.mjs` 插件到 `~/.config/opencode/plugins/`
+- 从 OpenCode SQLite 数据库读取会话标题和对话内容
+- Copilot 用量监控（GitHub Copilot 配额读取）
 
-- **Source badges** — **CC** (blue) for Claude Code, **OC** (purple) for OpenCode — auto-detected
-- **Auto-detected terminal** — colored tag: Ghostty, Warp, iTerm2, cmux, Terminal, VS Code, Cursor, etc.
-- **Task title** — displays your latest message or Claude's summary, not just the folder name
-- **Duration badge** — how long each session has been running
-- **Terminal jump button** — click to jump to the exact terminal tab
-- **Dismiss button** — × on every session (including active ones) to hide from CodeIsland without killing the process
-- **Subagent tracking** — ⚡ badge + collapsible sub-agent tool list
-- **Inline approval** — Allow/Deny buttons appear inline for permission requests
+#### 直接对话输入增强
+- 对话框底部常驻输入框，打开时自动聚焦
+- 发送路由增强：iTerm2 AppleScript → Terminal.app → **tmux send-keys** → **Ghostty 剪贴板粘贴** → cmux CLI → 剪贴板兜底
+- Claude/OpenCode 处理中自动禁用输入
 
-### OpenCode Support
+#### Zombie Session 检测
+- PosixLivenessChecker（`kill -0`）存活检查，5 秒间隔扫描
+- 自动标记死亡会话为 `.ended`，取消挂起的权限/中断监听
+- "Clear Ended" 按钮一键清除已结束会话
 
-First-class support for [OpenCode](https://opencode.ai) alongside Claude Code:
+#### JSONL 中断监听增强
+- 支持父目录遍历查找 JSONL 文件路径（匹配 ConversationParser 行为）
+- 新增 `result` 级别错误检测（`is_error: true`）
+- 新增 `Cancelled` / `cancelled` 中断关键词
 
-- **Auto-detection** — OpenCode sessions detected by session ID format (`ses_` prefix) — no manual config
-- **OC badge** — purple **OC** label distinguishes OpenCode from Claude Code (**CC**) sessions
-- **Conversation display** — reads titles and messages from OpenCode's SQLite database
-- **Plugin** — `codeisland-opencode.mjs` installed automatically to `~/.config/opencode/plugins/`
-- **Permission approval** — Allow/Deny works for OpenCode permission requests
-- **Direct chat input** — type messages straight into any OpenCode session
+### 体验优化
 
-### Direct Chat Input
+#### 审批 UI 布局优化
+- 审批按钮（Allow/Deny、选项按钮）提升至标题正下方，无需滚动即可操作
+- 审批状态下隐藏副标题和工具信息，减少视觉干扰
+- 审批会话数独立追踪，面板高度动态适配
 
-Type messages directly in the chat dialog — no terminal switching needed:
+#### 会话管理增强
+- 所有会话（含活跃中）均显示 × 关闭按钮（仅从 CodeIsland 移除，不终止进程）
+- 已结束会话显示 "Ended" 标签、降低透明度（0.4）、隐藏终端跳转按钮
+- CC/OC 来源标签始终可见
 
-- **Input bar** — always visible at the bottom of the chat view; auto-focuses when opened
-- **Send button** — appears when you start typing; press Enter or click ↑ to send
-- **Smart routing** — sends via iTerm2 AppleScript (by tty, no window focus), Terminal.app, cmux CLI, or clipboard fallback
-- **State-aware** — input disabled while Claude/OpenCode is processing
+#### 菜单面板清理
+- 移除底部微信号和推广文字
+- Buddy + UsageStatsBar 改为 VStack 底部流式布局（不再浮动遮挡会话列表）
+- 菜单基础高度 440→400，匹配实际内容
 
-### Permission Approval
+### Bug 修复
 
-Approve or deny permission requests right from the notch:
+- **权限审批 "允许" 无效**: Python hook 的 PermissionRequest 现在直接转发 `tool_use_id`，消除缓存 key 不匹配导致的静默失败
+- **OpenCode 会话误判为子会话**: 移除 cwd 备选匹配逻辑，仅保留精确 pid 匹配
+- **NotchView 格式修正**: 清理多余空行
 
-- **Code diff preview** — see exactly what will change before allowing
-- **Deny/Allow buttons** — with keyboard hint labels
-- **Fixed reliability** — `tool_use_id` now forwarded directly in the Python hook, eliminating silent failures when approving
+---
 
-### Claude Code Buddy Integration
+## 修改的文件列表
 
-Full integration with Claude Code's `/buddy` companion system:
+以下文件相比原版 ([xmqywx/CodeIsland@main](https://github.com/xmqywx/CodeIsland)) 有修改：
 
-- **Accurate stats** — all 5 stats computed using the same algorithm as Claude Code
-- **ASCII art sprite** — all 18 buddy species with idle animation
-- **Buddy card** — ASCII sprite + stat bars + personality
+### Swift 源码
 
-### Pixel Cat Companion
+| 文件 | 修改类型 | 说明 |
+|------|---------|------|
+| `ClaudeIsland/Core/NotchViewModel.swift` | 修改 | 新增 `approvalSessionCount` 追踪，面板高度动态适配 |
+| `ClaudeIsland/Core/DebugLogger.swift` | 修改 | Swift 6 Sendable + nonisolated 修复 |
+| `ClaudeIsland/Core/Localization.swift` | 修改 | 新增 ended / clearEnded 本地化字符串 |
+| `ClaudeIsland/Models/SessionEvent.swift` | 修改 | 新增 `clearEndedSessions` 事件 |
+| `ClaudeIsland/Models/SessionState.swift` | 修改 | 新增 `source` 字段、OpenCode 会话识别 |
+| `ClaudeIsland/Services/Session/ClaudeSessionMonitor.swift` | 修改 | zombie scan 启动，间隔 5s |
+| `ClaudeIsland/Services/Session/JSONLInterruptWatcher.swift` | 修改 | 父目录遍历、result error 检测、新增中断关键词 |
+| `ClaudeIsland/Services/State/SessionStore.swift` | 修改 | zombie scan、clearEndedSessions、OpenCode 识别 |
+| `ClaudeIsland/Services/Hooks/HookSocketServer.swift` | 修改 | OpenCode 事件处理 |
+| `ClaudeIsland/Services/Shared/TerminalAppRegistry.swift` | 修改 | 终端检测增强 |
+| `ClaudeIsland/Services/Window/TerminalJumper.swift` | 修改 | 跳转逻辑增强 |
+| `ClaudeIsland/UI/Views/ChatView.swift` | 修改 | 直接输入 + tmux/Ghostty 发送支持 |
+| `ClaudeIsland/UI/Views/ClaudeInstancesView.swift` | 修改 | 审批 UI 布局优先、CC/OC 标签、×按钮、ended 样式 |
+| `ClaudeIsland/UI/Views/NotchMenuView.swift` | 修改 | 移除推广文字、Buddy 布局调整 |
+| `ClaudeIsland/UI/Views/NotchView.swift` | 修改 | 格式清理 |
+| `ClaudeIsland/App/AppDelegate.swift` | 修改 | OpenCode 插件安装逻辑 |
+| `ClaudeIsland/Resources/codeisland-state.py` | 修改 | tool_use_id 转发修复 |
 
-A hand-drawn pixel cat with 6 animated states:
+### 新增文件
 
-| State | Expression |
-|-------|-----------|
-| Idle | Black eyes, gentle blink every 90 frames |
-| Working | Eyes dart left/center/right |
-| Needs You | Eyes + right ear twitches |
-| Thinking | Closed eyes, breathing nose |
-| Error | Red X eyes |
-| Done | Green heart eyes + green tint overlay |
+| 文件 | 说明 |
+|------|------|
+| `ClaudeIsland/Resources/codeisland-opencode.mjs` | OpenCode 插件 |
+| `ClaudeIsland/Services/Hooks/OpenCodeHookInstaller.swift` | OpenCode 插件安装器 |
+| `ClaudeIsland/Services/Session/CopilotQuotaMonitor.swift` | Copilot 用量监控 |
+| `ClaudeIsland/Services/Session/OpenCodeConversationParser.swift` | OpenCode SQLite 对话解析 |
+| `ClaudeIsland/Services/State/ProcessLivenessChecker.swift` | 进程存活检查器 |
+| `ClaudeIsland/UI/Helpers/SessionFilter.swift` | 会话过滤辅助 |
 
-### 8-bit Sound System
+### 删除的文件
 
-Chiptune alerts for every event. Each sound can be toggled individually.
+| 文件 | 说明 |
+|------|------|
+| `ClaudeIsland/Services/Session/RateLimitMonitor.swift` | 替换为 CopilotQuotaMonitor |
+| `ClaudeIsland/Core/SoundManager.swift` | 音效管理移除（部分功能） |
 
-### Project Grouping
+### 其他
 
-Toggle between flat list and project-grouped view. Sessions automatically grouped by working directory.
+| 文件 | 说明 |
+|------|------|
+| `landing/` | 官网 landing page（含国际化、MacBook mockup、社区弹窗等） |
+| `.github/workflows/deploy-landing.yml` | Landing page 部署 workflow |
+| `README.md` | 重写为修改版说明 |
+| `README.zh-CN.md` | 中文 README 更新 |
 
-## Settings
+---
 
-| Setting | Description |
-|---------|-------------|
-| **Screen** | Choose which display shows the notch |
-| **Notification Sound** | Select alert sound style |
-| **Group by Project** | Toggle between flat list and project-grouped sessions |
-| **Pixel Cat Mode** | Switch notch icon between pixel cat and buddy emoji animation |
-| **Language** | Auto (system) / English / 中文 |
-| **Launch at Login** | Start CodeIsland automatically when you log in |
-| **Hooks** | Install/uninstall Claude Code hooks in `~/.claude/settings.json` |
-| **Accessibility** | Grant accessibility permission for terminal window focusing |
-
-## Terminal Support
-
-CodeIsland auto-detects your terminal from the process tree:
-
-| Terminal | Detection | Jump-to-Tab | Direct Input |
-|----------|-----------|-------------|--------------|
-| cmux | Auto | AppleScript (workspace level) | ✅ |
-| iTerm2 | Auto | AppleScript (by tty) | ✅ no focus steal |
-| Terminal.app | Auto | AppleScript | ✅ |
-| Ghostty | Auto | AppleScript | clipboard fallback |
-| Warp | Auto | Activate only | clipboard fallback |
-| Kitty | Auto | CLI | clipboard fallback |
-| WezTerm | Auto | CLI | clipboard fallback |
-| VS Code | Auto | Activate | clipboard fallback |
-| Cursor | Auto | Activate | clipboard fallback |
-
-> **Recommended: [cmux](https://cmux.io)** — A modern terminal multiplexer built on Ghostty. CodeIsland works best with cmux: precise workspace-level jumping, AskUserQuestion quick reply, and smart popup suppression per workspace tab.
-
-## Install
-
-**Download** the latest `.dmg` from [Releases](https://github.com/kiarimovv/KodeIsLand/releases), open it, drag to Applications.
-
-> **macOS Gatekeeper warning:** If you see "Code Island is damaged and can't be opened", run:
-> ```bash
-> sudo xattr -rd com.apple.quarantine /Applications/Code\ Island.app
-> ```
-
-### Build from Source
+## 构建
 
 ```bash
 git clone https://github.com/kiarimovv/KodeIsLand.git
@@ -166,41 +140,15 @@ xcodebuild -project ClaudeIsland.xcodeproj -scheme ClaudeIsland \
   DEVELOPMENT_TEAM="" build
 ```
 
-### Requirements
+### 要求
 
 - macOS 14+ (Sonoma)
-- MacBook with notch (floating mode on external displays)
-- [Bun](https://bun.sh) for accurate buddy stats (optional)
+- MacBook with notch（外接显示器使用浮动模式）
 
-## How It Works
-
-1. **Zero config** — on first launch, CodeIsland installs hooks into `~/.claude/settings.json` and the OpenCode plugin into `~/.config/opencode/plugins/`
-2. **Hook events** — a Python script (`codeisland-state.py`) sends Claude Code session state via Unix socket (`/tmp/codeisland.sock`); the MJS plugin does the same for OpenCode
-3. **Session detection** — Claude Code sessions identified by UUID format; OpenCode sessions by `ses_` prefix
-4. **Permission approval** — socket stays open until you click Allow/Deny, then sends the decision back
-5. **Direct input** — text typed in the chat view is sent to the terminal via AppleScript or cmux CLI
-6. **Terminal jump** — AppleScript finds and focuses the correct terminal tab by tty or working directory
-
-## Contributing
-
-Contributions are welcome!
-
-1. **Report bugs** — [Open an issue](https://github.com/kiarimovv/KodeIsLand/issues)
-2. **Submit a PR** — Fork the repo, create a branch, make your changes
-3. **Suggest features** — Open an issue tagged `enhancement`
-
-## 参与贡献
-
-欢迎参与！
-
-1. **提交 Bug** — 在 [Issues](https://github.com/kiarimovv/KodeIsLand/issues) 中描述问题
-2. **提交 PR** — Fork 本仓库，新建分支，修改后提交 Pull Request
-3. **建议功能** — 在 Issues 中提出，标记为 `enhancement`
-
-## Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=kiarimovv/KodeIsLand&type=Date)](https://star-history.com/#kiarimovv/KodeIsLand&Date)
+---
 
 ## License
 
-CC BY-NC 4.0 — free for personal use, no commercial use.
+CC BY-NC 4.0 — 仅供个人使用，禁止商业用途。
+
+原版协议见 [xmqywx/CodeIsland](https://github.com/xmqywx/CodeIsland)。
