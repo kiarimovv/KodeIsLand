@@ -32,7 +32,20 @@ actor OpenCodeConversationParser {
     /// sessionId → (dbModTime, info)
     private var cache: [String: (modTime: TimeInterval, info: ConversationInfo)] = [:]
 
+    /// sessionId → (dbModTime, messages) — 完整对话缓存
+    private var fullCache: [String: (modTime: TimeInterval, messages: [ChatMessage])] = [:]
+
     // MARK: - Public
+
+    func parseFullConversation(sessionId: String) -> [ChatMessage] {
+        let modTime = dbModificationTime()
+        if let hit = fullCache[sessionId], hit.modTime == modTime {
+            return hit.messages
+        }
+        let messages = queryFullConversation(sessionId: sessionId)
+        fullCache[sessionId] = (modTime: modTime, messages: messages)
+        return messages
+    }
 
     func parse(sessionId: String) -> ConversationInfo? {
         let modTime = dbModificationTime()
@@ -129,6 +142,107 @@ actor OpenCodeConversationParser {
     }
 
     // MARK: - sqlite3 subprocess
+
+    /// 查询完整对话：message + part，按时间排序后组装为 [ChatMessage]
+    private func queryFullConversation(sessionId: String) -> [ChatMessage] {
+        let sql = """
+        SELECT m.id AS message_id,
+               json_extract(m.data,'$.role') AS role,
+               m.time_created AS msg_ts,
+               p.id AS part_id,
+               json_extract(p.data,'$.type') AS part_type,
+               json_extract(p.data,'$.text') AS text,
+               json_extract(p.data,'$.tool') AS tool_name,
+               p.data AS part_data,
+               p.time_created AS part_ts
+        FROM message m
+        JOIN part p ON p.message_id = m.id
+        WHERE m.session_id = '\(esc(sessionId))'
+          AND (json_extract(p.data,'$.type') != 'text'
+               OR json_extract(p.data,'$.text') NOT LIKE '%INTERNAL%')
+        ORDER BY m.time_created ASC, p.time_created ASC;
+        """
+
+        guard let rows = runSQL(sql) else { return [] }
+
+        var grouped: [(id: String, role: String, ts: Int64, parts: [[String: Any]])] = []
+        var indexMap: [String: Int] = [:]
+
+        for row in rows {
+            guard let msgId = row["message_id"] as? String,
+                  let role = row["role"] as? String else { continue }
+
+            let ts: Int64
+            if let v = row["msg_ts"] as? Int64 { ts = v }
+            else if let v = row["msg_ts"] as? Double { ts = Int64(v) }
+            else if let s = row["msg_ts"] as? String, let v = Int64(s) { ts = v }
+            else { ts = 0 }
+
+            if let idx = indexMap[msgId] {
+                grouped[idx].parts.append(row)
+            } else {
+                indexMap[msgId] = grouped.count
+                grouped.append((id: msgId, role: role, ts: ts, parts: [row]))
+            }
+        }
+
+        var messages: [ChatMessage] = []
+        for group in grouped {
+            let chatRole: ChatRole = group.role == "user" ? .user : .assistant
+            let timestamp = Date(timeIntervalSince1970: Double(group.ts) / 1000.0)
+
+            var blocks: [MessageBlock] = []
+            for part in group.parts {
+                guard let partType = part["part_type"] as? String else { continue }
+
+                switch partType {
+                case "text":
+                    guard let raw = part["text"] as? String,
+                          let cleaned = cleanText(raw), !cleaned.isEmpty else { continue }
+                    blocks.append(.text(cleaned))
+
+                case "tool":
+                    let toolName = (part["tool_name"] as? String) ?? "unknown"
+                    let partId = (part["part_id"] as? String) ?? UUID().uuidString
+                    let input = extractToolInput(from: part["part_data"])
+                    blocks.append(.toolUse(ToolUseBlock(id: partId, name: toolName, input: input)))
+
+                default:
+                    // step-start / step-finish 等类型忽略
+                    break
+                }
+            }
+
+            guard !blocks.isEmpty else { continue }
+            messages.append(ChatMessage(
+                id: group.id,
+                role: chatRole,
+                timestamp: timestamp,
+                content: blocks
+            ))
+        }
+
+        Self.logger.debug("parseFullConversation sid=\(sessionId.prefix(8)) msgs=\(messages.count, privacy: .public)")
+        return messages
+    }
+
+    private func extractToolInput(from partData: Any?) -> [String: String] {
+        guard let raw = partData as? String,
+              let data = raw.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return [:]
+        }
+        // OpenCode part.data 中可能有 input / arguments 等字段
+        if let input = json["input"] as? [String: Any] {
+            return input.compactMapValues { "\($0)" }
+        }
+        if let args = json["arguments"] as? [String: Any] {
+            return args.compactMapValues { "\($0)" }
+        }
+        return [:]
+    }
+
+    // MARK: - Run SQL
 
     /// Run one or more SQL statements via sqlite3 -json and return parsed rows.
     private func runSQL(_ sql: String) -> [[String: Any]]? {

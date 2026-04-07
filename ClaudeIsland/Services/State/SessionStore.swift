@@ -599,12 +599,17 @@ actor SessionStore {
 
         DebugLogger.log("FileUpdate", "sid=\(payload.sessionId.prefix(8)) msgs=\(payload.messages.count) inc=\(payload.isIncremental)")
 
-        // Update conversationInfo from JSONL (summary, lastMessage, etc.)
-        let conversationInfo = await ConversationParser.shared.parse(
-            sessionId: payload.sessionId,
-            cwd: session.cwd
-        )
-        session.conversationInfo = conversationInfo
+        if session.source == .opencode {
+            if let info = await OpenCodeConversationParser.shared.parse(sessionId: payload.sessionId) {
+                session.conversationInfo = info
+            }
+        } else {
+            let conversationInfo = await ConversationParser.shared.parse(
+                sessionId: payload.sessionId,
+                cwd: session.cwd
+            )
+            session.conversationInfo = conversationInfo
+        }
 
         // Handle /clear reconciliation - remove items that no longer exist in parser state
         if session.needsClearReconciliation {
@@ -1004,20 +1009,34 @@ actor SessionStore {
     // MARK: - History Loading
 
     private func loadHistoryFromFile(sessionId: String, cwd: String) async {
-        // Parse file asynchronously
-        let messages = await ConversationParser.shared.parseFullConversation(
-            sessionId: sessionId,
-            cwd: cwd
-        )
-        let completedTools = await ConversationParser.shared.completedToolIds(for: sessionId)
-        let toolResults = await ConversationParser.shared.toolResults(for: sessionId)
-        let structuredResults = await ConversationParser.shared.structuredResults(for: sessionId)
+        let source = sessions[sessionId]?.source ?? .claude
 
-        // Also parse conversationInfo (summary, lastMessage, etc.)
-        let conversationInfo = await ConversationParser.shared.parse(
-            sessionId: sessionId,
-            cwd: cwd
-        )
+        let messages: [ChatMessage]
+        let completedTools: Set<String>
+        let toolResults: [String: ConversationParser.ToolResult]
+        let structuredResults: [String: ToolResultData]
+        let conversationInfo: ConversationInfo
+
+        if source == .opencode {
+            // OpenCode: 从 SQLite 数据库查询完整对话
+            messages = await OpenCodeConversationParser.shared.parseFullConversation(sessionId: sessionId)
+            completedTools = []
+            toolResults = [:]
+            structuredResults = [:]
+            conversationInfo = await OpenCodeConversationParser.shared.parse(sessionId: sessionId)
+                ?? ConversationInfo(summary: nil, lastMessage: nil, lastMessageRole: nil,
+                                    lastToolName: nil, firstUserMessage: nil,
+                                    latestUserMessage: nil, lastUserMessageDate: nil)
+        } else {
+            // Claude Code: 从 JSONL 文件解析
+            messages = await ConversationParser.shared.parseFullConversation(
+                sessionId: sessionId, cwd: cwd)
+            completedTools = await ConversationParser.shared.completedToolIds(for: sessionId)
+            toolResults = await ConversationParser.shared.toolResults(for: sessionId)
+            structuredResults = await ConversationParser.shared.structuredResults(for: sessionId)
+            conversationInfo = await ConversationParser.shared.parse(
+                sessionId: sessionId, cwd: cwd)
+        }
 
         // Process loaded history
         await process(.historyLoaded(
@@ -1080,39 +1099,51 @@ actor SessionStore {
     // MARK: - File Sync Scheduling
 
     private func scheduleFileSync(sessionId: String, cwd: String) {
-        // Cancel existing sync
         cancelPendingSync(sessionId: sessionId)
 
-        // Schedule new debounced sync
+        let source = sessions[sessionId]?.source ?? .claude
+
         pendingSyncs[sessionId] = Task { [weak self, syncDebounceNs] in
             try? await Task.sleep(nanoseconds: syncDebounceNs)
             guard !Task.isCancelled else { return }
 
-            // Parse incrementally - only get NEW messages since last call
-            let result = await ConversationParser.shared.parseIncremental(
-                sessionId: sessionId,
-                cwd: cwd
-            )
+            if source == .opencode {
+                // OpenCode: 重新查询 SQLite 获取最新对话
+                let messages = await OpenCodeConversationParser.shared.parseFullConversation(sessionId: sessionId)
+                guard !messages.isEmpty else { return }
 
-            if result.clearDetected {
-                await self?.process(.clearDetected(sessionId: sessionId))
+                let payload = FileUpdatePayload(
+                    sessionId: sessionId,
+                    cwd: cwd,
+                    messages: messages,
+                    isIncremental: false,
+                    completedToolIds: [],
+                    toolResults: [:],
+                    structuredResults: [:]
+                )
+                await self?.process(.fileUpdated(payload))
+            } else {
+                // Claude Code: JSONL 增量解析
+                let result = await ConversationParser.shared.parseIncremental(
+                    sessionId: sessionId, cwd: cwd)
+
+                if result.clearDetected {
+                    await self?.process(.clearDetected(sessionId: sessionId))
+                }
+
+                guard !result.newMessages.isEmpty || result.clearDetected else { return }
+
+                let payload = FileUpdatePayload(
+                    sessionId: sessionId,
+                    cwd: cwd,
+                    messages: result.newMessages,
+                    isIncremental: !result.clearDetected,
+                    completedToolIds: result.completedToolIds,
+                    toolResults: result.toolResults,
+                    structuredResults: result.structuredResults
+                )
+                await self?.process(.fileUpdated(payload))
             }
-
-            guard !result.newMessages.isEmpty || result.clearDetected else {
-                return
-            }
-
-            let payload = FileUpdatePayload(
-                sessionId: sessionId,
-                cwd: cwd,
-                messages: result.newMessages,
-                isIncremental: !result.clearDetected,
-                completedToolIds: result.completedToolIds,
-                toolResults: result.toolResults,
-                structuredResults: result.structuredResults
-            )
-
-            await self?.process(.fileUpdated(payload))
         }
     }
 
