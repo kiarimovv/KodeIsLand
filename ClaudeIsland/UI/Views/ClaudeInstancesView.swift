@@ -87,6 +87,9 @@ struct ClaudeInstancesView: View {
                 viewModel.activeSessionCount = instances.filter {
                     $0.phase != .idle && $0.phase != .ended
                 }.count
+                viewModel.approvalSessionCount = instances.filter {
+                    $0.phase.isWaitingForApproval
+                }.count
             }
         }
     }
@@ -738,24 +741,7 @@ struct InstanceRow: View {
                             .onTapGesture { onArchive() }
                     }
 
-                    // Subtitle
-                    subtitleView
-
-                    // Active session: show last tool action
-                    if isActive, let toolName = session.lastToolName,
-                       let lastMsg = session.lastMessage {
-                        HStack(spacing: 3) {
-                            Image(systemName: "wrench.and.screwdriver")
-                                .font(.system(size: 8))
-                                .foregroundColor(.white.opacity(0.2))
-                            Text("\(toolName): \(lastMsg)")
-                                .font(.system(size: 9))
-                                .foregroundColor(.white.opacity(0.3))
-                                .lineLimit(1)
-                        }
-                    }
-
-                    // AskUserQuestion: show options inline
+                    // Approval UI — shown immediately below title so always visible without scrolling
                     if isWaitingForApproval, let options = askUserOptions {
                         VStack(alignment: .leading, spacing: 3) {
                             Text(L10n.claudeNeedsInput)
@@ -800,15 +786,32 @@ struct InstanceRow: View {
                         }
                         .padding(.top, 2)
                         .transition(.opacity.combined(with: .move(edge: .top)))
-                    }
-                    // Regular approval buttons
-                    else if isWaitingForApproval {
+                    } else if isWaitingForApproval {
                         InlineApprovalButtons(
                             onChat: onChat,
                             onApprove: onApprove,
                             onReject: onReject
                         )
                         .padding(.top, 2)
+                    }
+
+                    // Subtitle
+                    if !isWaitingForApproval {
+                        subtitleView
+                    }
+
+                    // Active session: show last tool action
+                    if isActive && !isWaitingForApproval, let toolName = session.lastToolName,
+                       let lastMsg = session.lastMessage {
+                        HStack(spacing: 3) {
+                            Image(systemName: "wrench.and.screwdriver")
+                                .font(.system(size: 8))
+                                .foregroundColor(.white.opacity(0.2))
+                            Text("\(toolName): \(lastMsg)")
+                                .font(.system(size: 9))
+                                .foregroundColor(.white.opacity(0.3))
+                                .lineLimit(1)
+                        }
                     }
                 }
             }

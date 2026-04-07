@@ -256,6 +256,7 @@ struct NotchView: View {
                             }
                         }
                     )
+
             }
         }
         .opacity(isVisible ? 1 : 0)

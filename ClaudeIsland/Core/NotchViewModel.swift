@@ -49,6 +49,7 @@ class NotchViewModel: ObservableObject {
     /// Session counts for dynamic panel sizing
     @Published var sessionCount: Int = 0
     @Published var activeSessionCount: Int = 0
+    @Published var approvalSessionCount: Int = 0
     @Published var isInstancesExpanded: Bool = false
 
     // MARK: - Dependencies
@@ -84,7 +85,8 @@ class NotchViewModel: ObservableObject {
         case .instances:
             let baseHeight: CGFloat = 100
             let perSession: CGFloat = 65
-            let contentHeight = baseHeight + CGFloat(sessionCount) * perSession
+            let approvalExtra: CGFloat = CGFloat(approvalSessionCount) * 50
+            let contentHeight = baseHeight + CGFloat(sessionCount) * perSession + approvalExtra
             // ≤4 sessions: fit content + room for buddy; >4: capped unless expanded
             let compactMax: CGFloat = 360
             let expandedMax: CGFloat = min(screenRect.height * 0.65, 600)
