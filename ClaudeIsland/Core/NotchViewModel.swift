@@ -90,6 +90,7 @@ class NotchViewModel: ObservableObject {
             // ≤4 sessions: fit content + room for buddy; >4: capped unless expanded
             let compactMax: CGFloat = 360
             let expandedMax: CGFloat = min(screenRect.height * 0.65, 600)
+            let minHeight: CGFloat = sessionCount == 0 ? 160 : 200
             let height: CGFloat
             if sessionCount <= 4 {
                 height = min(contentHeight, expandedMax)
@@ -98,7 +99,7 @@ class NotchViewModel: ObservableObject {
             }
             return CGSize(
                 width: min(screenRect.width * 0.4, 480),
-                height: max(height, 200)
+                height: max(height, minHeight)
             )
         }
     }

@@ -138,13 +138,30 @@ actor SessionStore {
         let isNewSession = sessions[sessionId] == nil
         DebugLogger.log("Hook", "\(event.event) status=\(event.status) sid=\(sessionId.prefix(8)) new=\(isNewSession)")
 
-        if isNewSession, event.source == "opencode", let ppid = event.ppid {
-            // 精确匹配：父会话的 pid == 子进程的 ppid（OpenCode 子进程场景）
-            // 注意：不用 cwd 做备选匹配，同目录的独立 OpenCode 会话不是父子关系
-            let parentId = sessions.first { entry in
-                let s = entry.value
-                return s.source == .opencode && s.pid == ppid
-            }?.key
+        let isOpenCode = event.source == "opencode" || sessionId.hasPrefix("ses_")
+        if isNewSession, isOpenCode {
+            var parentId: String?
+
+            // 方法 1: ppid 精确匹配（子进程场景 — OpenCode 以独立进程 spawn subagent 时）
+            if let ppid = event.ppid {
+                parentId = sessions.first { entry in
+                    let s = entry.value
+                    return s.source == .opencode && s.pid == ppid
+                }?.key
+            }
+
+            // 方法 2: 同进程 fallback — task() subagent 与父共享 pid，ppid 指向 shell 而非父会话
+            // 注意：不能依赖 hasActiveSubagent，因为 run_in_background=true 时
+            // Task 工具立刻返回（PostToolUse → stopTask），子会话的 session.created 滞后数秒
+            // 所以改用 "同 pid 且非子会话" 来识别父会话
+            if parentId == nil, let pid = event.pid {
+                parentId = sessions.filter { entry in
+                    let s = entry.value
+                    return s.source == .opencode && s.pid == pid && entry.key != sessionId
+                }.first { entry in
+                    !entry.value.isChildSession && entry.value.phase != .ended
+                }?.key
+            }
 
             if let parentId {
                 var childSession = createSession(from: event)
@@ -154,14 +171,11 @@ actor SessionStore {
                     parent.lastActivity = Date()
                     sessions[parentId] = parent
                 }
-                DebugLogger.log(
-                    "Hook",
-                    "Created opencode child session sid=\(sessionId.prefix(8)) ppid=\(ppid) parent=\(parentId.prefix(8))"
-                )
+                DebugLogger.log("Hook", "Created child sid=\(sessionId.prefix(8)) parent=\(parentId.prefix(8))")
                 publishState()
                 return
             }
-            DebugLogger.log("Hook", "No parent found for new opencode sid=\(sessionId.prefix(8)) ppid=\(ppid)")
+            DebugLogger.log("Hook", "No parent found for sid=\(sessionId.prefix(8)) pid=\(event.pid ?? -1) ppid=\(event.ppid ?? -1)")
         }
 
         var session = sessions[sessionId] ?? createSession(from: event)

@@ -208,8 +208,6 @@ struct ClaudeInstancesView: View {
             .padding(.horizontal, 10)
             .padding(.top, 6)
 
-            Spacer()
-
             // Animated pixel cat
             VStack(spacing: 12) {
                 if usePixelCat {
@@ -243,6 +241,7 @@ struct ClaudeInstancesView: View {
                 UsageStatsBar(monitor: rateLimitMonitor, copilotMonitor: copilotMonitor, totalMinutes: 0)
                     .padding(.top, 4)
             }
+            .padding(.top, 8)
 
             Spacer()
         }
@@ -317,14 +316,15 @@ struct ClaudeInstancesView: View {
 
     /// 合并进程子会话和 Task subagent 为统一子项列表
     private func childAgentItems(for parent: SessionState) -> [ChildAgentItem] {
-        // 进程级子会话
         let sessionItems = sessionMonitor.instances
             .filter { $0.parentSessionId == parent.sessionId }
             .map { ChildAgentItem.session($0) }
 
-        // Task subagent
-        let taskItems = parent.subagentState.activeTasks.values
-            .map { ChildAgentItem.task($0) }
+        // 仅保留没有对应 session child 的 TaskContext（避免同一 subagent 双重显示）
+        let sessionChildCount = sessionItems.count
+        let taskItems: [ChildAgentItem] = sessionChildCount > 0
+            ? []
+            : parent.subagentState.activeTasks.values.map { ChildAgentItem.task($0) }
 
         return (sessionItems + taskItems).sorted { $0.sortDate < $1.sortDate }
     }
@@ -1405,13 +1405,13 @@ struct ChildAgentListView: View {
     private var lineColor: Color {
         items.contains { $0.needsApproval }
             ? Color(red: 1.0, green: 0.67, blue: 0.27)
-            : Color(red: 0.2, green: 0.27, blue: 0.27)
+            : Color(red: 0.2, green: 0.2, blue: 0.267)
     }
 
     private func phaseColor(_ phase: SessionPhase) -> Color {
         switch phase {
         case .processing, .compacting:
-            return Color(red: 0.4, green: 0.91, blue: 0.98)
+            return Color(red: 0.29, green: 0.87, blue: 0.5)
         case .waitingForApproval:
             return Color(red: 0.96, green: 0.62, blue: 0.04)
         case .waitingForInput:
@@ -1493,7 +1493,7 @@ struct ChildAgentListView: View {
             }
         }
         .padding(.leading, 12)
-        .background(Color(red: 0.086, green: 0.086, blue: 0.165).opacity(0.5))
+        .background(Color(red: 0.086, green: 0.086, blue: 0.165))
     }
 }
 
