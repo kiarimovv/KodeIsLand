@@ -321,11 +321,14 @@ struct ClaudeInstancesView: View {
             .sorted { $0.createdAt < $1.createdAt }
     }
 
+    /// 合并进程子会话和 Task subagent 为统一子项列表
     private func childAgentItems(for parent: SessionState) -> [ChildAgentItem] {
+        // 进程级子会话
         let sessionItems = sessionMonitor.instances
             .filter { $0.parentSessionId == parent.sessionId }
             .map { ChildAgentItem.session($0) }
 
+        // Task subagent
         let taskItems = parent.subagentState.activeTasks.values
             .map { ChildAgentItem.task($0) }
 
@@ -1307,9 +1310,10 @@ struct TerminalButton: View {
 
 // MARK: - Child Agent Item
 
+/// 统一进程级子会话和 Task subagent 的数据模型
 enum ChildAgentItem: Identifiable {
-    case session(SessionState)
-    case task(TaskContext)
+    case session(SessionState)           // 进程级子会话
+    case task(TaskContext)               // Task subagent
 
     var id: String {
         switch self {
@@ -1325,6 +1329,7 @@ enum ChildAgentItem: Identifiable {
         }
     }
 
+    /// 统一 phase 映射：活跃 Task 恒为 .processing
     var phase: SessionPhase {
         switch self {
         case .session(let s): return s.phase
@@ -1332,6 +1337,7 @@ enum ChildAgentItem: Identifiable {
         }
     }
 
+    /// 是否需要审批（仅进程子会话可能触发）
     var needsApproval: Bool {
         switch self {
         case .session(let s): return s.phase.isWaitingForApproval
