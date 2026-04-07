@@ -321,6 +321,17 @@ struct ClaudeInstancesView: View {
             .sorted { $0.createdAt < $1.createdAt }
     }
 
+    private func childAgentItems(for parent: SessionState) -> [ChildAgentItem] {
+        let sessionItems = sessionMonitor.instances
+            .filter { $0.parentSessionId == parent.sessionId }
+            .map { ChildAgentItem.session($0) }
+
+        let taskItems = parent.subagentState.activeTasks.values
+            .map { ChildAgentItem.task($0) }
+
+        return (sessionItems + taskItems).sorted { $0.sortDate < $1.sortDate }
+    }
+
     private var flatList: some View {
         ScrollView(.vertical, showsIndicators: false) {
             LazyVStack(spacing: 0) {
@@ -1291,6 +1302,48 @@ struct TerminalButton: View {
             .clipShape(Capsule())
         }
         .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Child Agent Item
+
+enum ChildAgentItem: Identifiable {
+    case session(SessionState)
+    case task(TaskContext)
+
+    var id: String {
+        switch self {
+        case .session(let s): return "ses-\(s.sessionId)"
+        case .task(let t):    return "task-\(t.taskToolId)"
+        }
+    }
+
+    var displayName: String {
+        switch self {
+        case .session(let s): return s.projectName
+        case .task(let t):    return t.description ?? "Agent"
+        }
+    }
+
+    var phase: SessionPhase {
+        switch self {
+        case .session(let s): return s.phase
+        case .task:           return .processing
+        }
+    }
+
+    var needsApproval: Bool {
+        switch self {
+        case .session(let s): return s.phase.isWaitingForApproval
+        case .task:           return false
+        }
+    }
+
+    var sortDate: Date {
+        switch self {
+        case .session(let s): return s.createdAt
+        case .task(let t):    return t.startTime
+        }
     }
 }
 
