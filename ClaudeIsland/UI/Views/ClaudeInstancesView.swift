@@ -1353,6 +1353,108 @@ enum ChildAgentItem: Identifiable {
     }
 }
 
+// MARK: - Child Agent List View
+
+/// 统一的子 agent 列表视图（替代 ChildSessionsView + SubagentListView）
+struct ChildAgentListView: View {
+    let items: [ChildAgentItem]
+    let onChildFocus: ((SessionState) -> Void)?
+
+    private var lineColor: Color {
+        items.contains { $0.needsApproval }
+            ? Color(red: 1.0, green: 0.67, blue: 0.27)
+            : Color(red: 0.2, green: 0.27, blue: 0.27)
+    }
+
+    private func phaseColor(_ phase: SessionPhase) -> Color {
+        switch phase {
+        case .processing, .compacting:
+            return Color(red: 0.4, green: 0.91, blue: 0.98)
+        case .waitingForApproval:
+            return Color(red: 0.96, green: 0.62, blue: 0.04)
+        case .waitingForInput:
+            return Color(red: 0.29, green: 0.87, blue: 0.5)
+        case .idle, .ended:
+            return .white.opacity(0.25)
+        }
+    }
+
+    private func phaseLabel(_ item: ChildAgentItem) -> String {
+        if item.needsApproval { return "需要审批" }
+        switch item.phase {
+        case .processing:          return "processing"
+        case .compacting:          return "compacting"
+        case .waitingForApproval:  return "需要审批"
+        case .waitingForInput:     return "waiting"
+        case .idle:                return "idle"
+        case .ended:               return "ended"
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(items) { item in
+                HStack(spacing: 5) {
+                    HStack(spacing: 0) {
+                        Rectangle()
+                            .fill(lineColor.opacity(0.4))
+                            .frame(width: 2)
+                        Rectangle()
+                            .fill(lineColor.opacity(0.3))
+                            .frame(width: 8, height: 1)
+                    }
+                    .frame(width: 12, height: 16)
+                    .padding(.leading, 16)
+
+                    Circle()
+                        .fill(phaseColor(item.phase))
+                        .frame(width: 4, height: 4)
+
+                    Text(item.displayName)
+                        .font(.system(size: 10))
+                        .foregroundColor(.white.opacity(0.45))
+                        .lineLimit(1)
+
+                    Spacer()
+
+                    Text(phaseLabel(item))
+                        .font(.system(size: 8, weight: item.needsApproval ? .semibold : .regular))
+                        .foregroundColor(
+                            item.needsApproval
+                                ? Color(red: 1.0, green: 0.67, blue: 0.27)
+                                : phaseColor(item.phase).opacity(0.6)
+                        )
+
+                    if case .session(let s) = item {
+                        Image(systemName: "terminal")
+                            .font(.system(size: 8))
+                            .foregroundColor(.white.opacity(0.25))
+                            .frame(width: 14, height: 14)
+                            .contentShape(Rectangle())
+                            .onTapGesture { onChildFocus?(s) }
+                    }
+                }
+                .padding(.vertical, 2)
+                .padding(.trailing, 8)
+                .background(
+                    Group {
+                        if item.needsApproval {
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(Color(red: 0.17, green: 0.1, blue: 0.04))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 4)
+                                        .strokeBorder(Color(red: 1.0, green: 0.67, blue: 0.27).opacity(0.3), lineWidth: 0.5)
+                                )
+                        }
+                    }
+                )
+            }
+        }
+        .padding(.leading, 12)
+        .background(Color(red: 0.086, green: 0.086, blue: 0.165).opacity(0.5))
+    }
+}
+
 // MARK: - Child Sessions View (OpenCode subagent 进程级子会话)
 
 struct ChildSessionsView: View {
