@@ -511,8 +511,12 @@ struct InstanceRow: View {
     let onArchive: () -> Void
     let onApprove: () -> Void
     let onReject: () -> Void
+    var childItems: [ChildAgentItem] = []
+    var onChildFocus: ((SessionState) -> Void)?
 
     @State private var isHovered = false
+    @State private var isExpanded = false
+    @State private var badgePulse = false
 
     // MARK: - Colors
 
@@ -590,6 +594,24 @@ struct InstanceRow: View {
         }
     }
 
+    private var hasChildren: Bool { !childItems.isEmpty }
+
+    private var childNeedsApproval: Bool {
+        childItems.contains { $0.needsApproval }
+    }
+
+    private var badgeColor: Color {
+        childNeedsApproval
+            ? Color(red: 1.0, green: 0.67, blue: 0.27)
+            : Color(red: 0.4, green: 0.67, blue: 1.0)
+    }
+
+    private var badgeBgColor: Color {
+        childNeedsApproval
+            ? Color(red: 0.23, green: 0.17, blue: 0.1)
+            : Color(red: 0.1, green: 0.17, blue: 0.23)
+    }
+
     /// Title text: "projectName · displayTitle" or just projectName if same
     private var titleText: String {
         let display = session.displayTitle
@@ -651,51 +673,78 @@ struct InstanceRow: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(alignment: .top, spacing: isActive ? 8 : 6) {
-                // Buddy icon or pixel cat
-                ZStack {
-                    if usePixelCat {
-                        PixelCharacterView(state: animationState)
-                            .scaleEffect(iconScale)
-                    } else if let buddy = buddyReader.buddy {
-                        EmojiPixelView(emoji: buddy.species.emoji, style: .rock)
-                            .scaleEffect(iconScale)
-                    } else {
-                        PixelCharacterView(state: animationState)
-                            .scaleEffect(iconScale)
-                    }
-                    // Status dot overlay
-                    Circle()
-                        .fill(accentColor)
-                        .frame(width: isActive ? 6 : 5, height: isActive ? 6 : 5)
-                        .shadow(color: accentColor.opacity(0.6), radius: isActive ? 3 : 2)
-                        .offset(x: iconSize / 2 - 3, y: iconSize / 2 - 3)
-                }
-                .frame(width: iconSize, height: iconSize)
-                .padding(.top, 2)
-
-                // Content
-                VStack(alignment: .leading, spacing: isActive ? 4 : 3) {
-                    // Title row
-                    HStack(spacing: 4) {
-                        Text(titleText)
-                            .font(.system(size: titleFontSize, weight: isActive ? .semibold : .medium))
-                            .foregroundColor(.white.opacity(isActive ? 0.95 : 0.85))
-                            .lineLimit(isActive ? 2 : 1)
-
-                        Spacer(minLength: 0)
-
-                        // Subagent badge (if active)
-                        if session.subagentState.hasActiveSubagent {
-                            Text("⚡\(session.subagentState.activeTasks.count)")
-                                .font(.system(size: 8, weight: .medium))
-                                .foregroundColor(Color(red: 0.6, green: 0.8, blue: 1.0))
-                                .padding(.horizontal, 4)
-                                .padding(.vertical, 2)
-                                .background(
-                                    Capsule().fill(Color(red: 0.6, green: 0.8, blue: 1.0).opacity(0.12))
-                                )
+            HStack(alignment: .top, spacing: 0) {
+                if hasChildren {
+                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                        .font(.system(size: 7, weight: .medium))
+                        .foregroundColor(.white.opacity(0.3))
+                        .frame(width: 14, height: isActive ? 28 : 22)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            withAnimation(.easeInOut(duration: 0.15)) {
+                                isExpanded.toggle()
+                            }
                         }
+                }
+
+                HStack(alignment: .top, spacing: isActive ? 8 : 6) {
+                    // Buddy icon or pixel cat
+                    ZStack {
+                        if usePixelCat {
+                            PixelCharacterView(state: animationState)
+                                .scaleEffect(iconScale)
+                        } else if let buddy = buddyReader.buddy {
+                            EmojiPixelView(emoji: buddy.species.emoji, style: .rock)
+                                .scaleEffect(iconScale)
+                        } else {
+                            PixelCharacterView(state: animationState)
+                                .scaleEffect(iconScale)
+                        }
+                        // Status dot overlay
+                        Circle()
+                            .fill(accentColor)
+                            .frame(width: isActive ? 6 : 5, height: isActive ? 6 : 5)
+                            .shadow(color: accentColor.opacity(0.6), radius: isActive ? 3 : 2)
+                            .offset(x: iconSize / 2 - 3, y: iconSize / 2 - 3)
+                    }
+                    .frame(width: iconSize, height: iconSize)
+                    .padding(.top, 2)
+
+                    // Content
+                    VStack(alignment: .leading, spacing: isActive ? 4 : 3) {
+                        // Title row
+                        HStack(spacing: 4) {
+                            Text(titleText)
+                                .font(.system(size: titleFontSize, weight: isActive ? .semibold : .medium))
+                                .foregroundColor(.white.opacity(isActive ? 0.95 : 0.85))
+                                .lineLimit(isActive ? 2 : 1)
+
+                            Spacer(minLength: 0)
+
+                            if hasChildren {
+                                Text(childNeedsApproval ? "!\(childItems.count)" : "\(childItems.count)")
+                                    .font(.system(size: 8, weight: .bold))
+                                    .foregroundColor(badgeColor)
+                                    .frame(minWidth: 16, minHeight: 16)
+                                    .background(Circle().fill(badgeBgColor))
+                                    .scaleEffect(badgePulse ? 1.15 : 1.0)
+                                    .opacity(badgePulse ? 0.8 : 1.0)
+                                    .animation(
+                                        childNeedsApproval
+                                            ? .easeInOut(duration: 0.8).repeatForever(autoreverses: true)
+                                            : .default,
+                                        value: badgePulse
+                                    )
+                                    .onChange(of: childNeedsApproval) { _, needs in
+                                        badgePulse = needs
+                                    }
+                                    .contentShape(Rectangle())
+                                    .onTapGesture {
+                                        withAnimation(.easeInOut(duration: 0.15)) {
+                                            isExpanded.toggle()
+                                        }
+                                    }
+                            }
 
                         // Source badge — CC (Claude Code) or OC (OpenCode)
                         Text(sourceTag)
@@ -755,12 +804,12 @@ struct InstanceRow: View {
                             .onTapGesture { onArchive() }
                     }
 
-                    // Approval UI — shown immediately below title so always visible without scrolling
-                    if isWaitingForApproval, let options = askUserOptions {
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(L10n.claudeNeedsInput)
-                                .font(.system(size: 9))
-                                .foregroundColor(TerminalColors.amber.opacity(0.7))
+                        // Approval UI — shown immediately below title so always visible without scrolling
+                        if isWaitingForApproval, let options = askUserOptions {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(L10n.claudeNeedsInput)
+                                    .font(.system(size: 9))
+                                    .foregroundColor(TerminalColors.amber.opacity(0.7))
 
                             HStack(spacing: 6) {
                                 ForEach(Array(options.prefix(3).enumerated()), id: \.offset) { index, option in
@@ -797,34 +846,35 @@ struct InstanceRow: View {
                                     .contentShape(Rectangle())
                                     .onTapGesture { onFocus() }
                             }
+                            }
+                            .padding(.top, 2)
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                        } else if isWaitingForApproval {
+                            InlineApprovalButtons(
+                                onChat: onChat,
+                                onApprove: onApprove,
+                                onReject: onReject
+                            )
+                            .padding(.top, 2)
                         }
-                        .padding(.top, 2)
-                        .transition(.opacity.combined(with: .move(edge: .top)))
-                    } else if isWaitingForApproval {
-                        InlineApprovalButtons(
-                            onChat: onChat,
-                            onApprove: onApprove,
-                            onReject: onReject
-                        )
-                        .padding(.top, 2)
-                    }
 
-                    // Subtitle
-                    if !isWaitingForApproval {
-                        subtitleView
-                    }
+                        // Subtitle
+                        if !isWaitingForApproval {
+                            subtitleView
+                        }
 
-                    // Active session: show last tool action
-                    if isActive && !isWaitingForApproval, let toolName = session.lastToolName,
-                       let lastMsg = session.lastMessage {
-                        HStack(spacing: 3) {
-                            Image(systemName: "wrench.and.screwdriver")
-                                .font(.system(size: 8))
-                                .foregroundColor(.white.opacity(0.2))
-                            Text("\(toolName): \(lastMsg)")
-                                .font(.system(size: 9))
-                                .foregroundColor(.white.opacity(0.3))
-                                .lineLimit(1)
+                        // Active session: show last tool action
+                        if isActive && !isWaitingForApproval, let toolName = session.lastToolName,
+                           let lastMsg = session.lastMessage {
+                            HStack(spacing: 3) {
+                                Image(systemName: "wrench.and.screwdriver")
+                                    .font(.system(size: 8))
+                                    .foregroundColor(.white.opacity(0.2))
+                                Text("\(toolName): \(lastMsg)")
+                                    .font(.system(size: 9))
+                                    .foregroundColor(.white.opacity(0.3))
+                                    .lineLimit(1)
+                            }
                         }
                     }
                 }
@@ -864,9 +914,24 @@ struct InstanceRow: View {
                     }
                 }
             }
+
+            if hasChildren && isExpanded {
+                ChildAgentListView(
+                    items: childItems,
+                    onChildFocus: onChildFocus
+                )
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
         }
         .opacity(isEnded ? 0.4 : 1.0)
         .onHover { isHovered = $0 }
+        .onChange(of: childNeedsApproval) { _, needsApproval in
+            if needsApproval && !isExpanded {
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    isExpanded = true
+                }
+            }
+        }
     }
 
     // MARK: - AskUserQuestion Response
