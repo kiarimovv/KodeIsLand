@@ -281,17 +281,8 @@ struct ClaudeInstancesView: View {
     /// Secondary sort: by last user message date (stable - doesn't change when agent responds)
     /// Note: approval requests stay in their date-based position to avoid layout shift
     private var sortedInstances: [SessionState] {
-        sessionMonitor.instances
-        .filter { session in
-            // 过滤掉子会话（在父会话下方单独渲染）
-            if session.isChildSession { return false }
-            // Filter out short-lived ended sessions (< 30s, likely from rate limit checks)
-            if session.phase == .ended {
-                let duration = Date().timeIntervalSince(session.createdAt)
-                return duration > 30
-            }
-            return true
-        }
+        SessionFilter.filterForDisplay(sessionMonitor.instances)
+        .filter { !$0.isChildSession }
         .sorted { a, b in
             let priorityA = phasePriority(a.phase)
             let priorityB = phasePriority(b.phase)
@@ -634,6 +625,8 @@ struct InstanceRow: View {
         }
     }
 
+    private var isEnded: Bool { session.phase == .ended }
+
     private var iconScale: CGFloat { isActive ? 0.45 : 0.35 }
     private var iconSize: CGFloat { isActive ? 28 : 22 }
     private var titleFontSize: CGFloat { isActive ? 13 : 11 }
@@ -712,17 +705,29 @@ struct InstanceRow: View {
                             .font(.system(size: 10, weight: isActive ? .medium : .regular))
                             .foregroundColor(isActive ? accentColor.opacity(0.7) : .white.opacity(0.3))
 
-                        // Terminal jump button — green tinted
-                        Image(systemName: "terminal")
-                            .font(.system(size: 10))
-                            .foregroundColor(Color(red: 0.29, green: 0.87, blue: 0.5).opacity(0.7))
-                            .frame(width: 20, height: 20)
-                            .background(
-                                RoundedRectangle(cornerRadius: 4)
-                                    .fill(Color(red: 0.29, green: 0.87, blue: 0.5).opacity(0.1))
-                            )
-                            .contentShape(Rectangle())
-                            .onTapGesture { onFocus() }
+                        // "Ended" capsule — only for ended sessions
+                        if isEnded {
+                            Text(L10n.ended)
+                                .font(.system(size: 8, weight: .medium))
+                                .foregroundColor(.white.opacity(0.35))
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 2)
+                                .background(Capsule().fill(Color.white.opacity(0.07)))
+                        }
+
+                        // Terminal jump button — hidden for ended sessions
+                        if !isEnded {
+                            Image(systemName: "terminal")
+                                .font(.system(size: 10))
+                                .foregroundColor(Color(red: 0.29, green: 0.87, blue: 0.5).opacity(0.7))
+                                .frame(width: 20, height: 20)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 4)
+                                        .fill(Color(red: 0.29, green: 0.87, blue: 0.5).opacity(0.1))
+                                )
+                                .contentShape(Rectangle())
+                                .onTapGesture { onFocus() }
+                        }
 
                         // Dismiss from CodeIsland (all sessions)
                         Image(systemName: "xmark")
@@ -843,6 +848,7 @@ struct InstanceRow: View {
                 }
             }
         }
+        .opacity(isEnded ? 0.4 : 1.0)
         .onHover { isHovered = $0 }
     }
 

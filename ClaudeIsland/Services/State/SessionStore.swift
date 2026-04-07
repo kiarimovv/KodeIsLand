@@ -29,6 +29,12 @@ actor SessionStore {
     /// Sync debounce interval (100ms)
     private let syncDebounceNs: UInt64 = 100_000_000
 
+    /// Process liveness checker (injectable for testing)
+    private let livenessChecker: ProcessLivenessChecker
+
+    /// Background task for periodic zombie session scanning
+    private var zombieScanTask: Task<Void, Never>?
+
     // MARK: - Published State (for UI)
 
     /// Publisher for session state changes (nonisolated for Combine subscription from any context)
@@ -41,7 +47,9 @@ actor SessionStore {
 
     // MARK: - Initialization
 
-    private init() {}
+    init(livenessChecker: ProcessLivenessChecker = PosixLivenessChecker()) {
+        self.livenessChecker = livenessChecker
+    }
 
     // MARK: - Event Processing
 
@@ -73,6 +81,9 @@ actor SessionStore {
 
         case .sessionEnded(let sessionId):
             await processSessionEnd(sessionId: sessionId)
+
+        case .clearEndedSessions:
+            clearEndedSessions()
 
         case .loadHistory(let sessionId, let cwd):
             await loadHistoryFromFile(sessionId: sessionId, cwd: cwd)
@@ -941,6 +952,53 @@ actor SessionStore {
     private func processSessionEnd(sessionId: String) async {
         sessions.removeValue(forKey: sessionId)
         cancelPendingSync(sessionId: sessionId)
+    }
+
+    // MARK: - Zombie Session Detection
+
+    func startZombieScan(interval: TimeInterval = 30) {
+        zombieScanTask?.cancel()
+        zombieScanTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
+                guard !Task.isCancelled else { break }
+                await self?.scanForZombies()
+            }
+        }
+    }
+
+    func stopZombieScan() {
+        zombieScanTask?.cancel()
+        zombieScanTask = nil
+    }
+
+    func scanForZombies() {
+        var zombieSessionIds: [String] = []
+        for (sessionId, session) in sessions {
+            guard session.phase != .ended else { continue }
+            guard let pid = session.pid else { continue }
+            if !livenessChecker.isAlive(pid: pid) {
+                Self.logger.info("Zombie detected: \(sessionId.prefix(8), privacy: .public) PID \(pid) is dead")
+                sessions[sessionId]?.phase = .ended
+                cancelPendingSync(sessionId: sessionId)
+                zombieSessionIds.append(sessionId)
+            }
+        }
+        for sessionId in zombieSessionIds {
+            HookSocketServer.shared.cancelPendingPermissions(sessionId: sessionId)
+            Task { @MainActor in
+                InterruptWatcherManager.shared.stopWatching(sessionId: sessionId)
+            }
+        }
+        if !zombieSessionIds.isEmpty { publishState() }
+    }
+
+    private func clearEndedSessions() {
+        let endedIds = sessions.filter { $0.value.phase == .ended }.map(\.key)
+        for id in endedIds {
+            sessions.removeValue(forKey: id)
+            cancelPendingSync(sessionId: id)
+        }
     }
 
     // MARK: - History Loading

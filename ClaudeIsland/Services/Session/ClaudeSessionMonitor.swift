@@ -31,6 +31,10 @@ class ClaudeSessionMonitor: ObservableObject {
     // MARK: - Monitoring Lifecycle
 
     func startMonitoring() {
+        Task {
+            await SessionStore.shared.startZombieScan()
+        }
+
         HookSocketServer.shared.start(
             onEvent: { event in
                 Task {
@@ -72,6 +76,15 @@ class ClaudeSessionMonitor: ObservableObject {
 
     func stopMonitoring() {
         HookSocketServer.shared.stop()
+        Task {
+            await SessionStore.shared.stopZombieScan()
+        }
+    }
+
+    func clearEndedSessions() {
+        Task {
+            await SessionStore.shared.process(.clearEndedSessions)
+        }
     }
 
     // MARK: - Permission Handling
