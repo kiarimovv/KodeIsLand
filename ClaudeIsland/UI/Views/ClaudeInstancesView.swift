@@ -345,22 +345,11 @@ struct ClaudeInstancesView: View {
                         onChat: { openChat(session) },
                         onArchive: { archiveSession(session) },
                         onApprove: { approveSession(session) },
-                        onReject: { rejectSession(session) }
+                        onReject: { rejectSession(session) },
+                        childItems: childAgentItems(for: session),
+                        onChildFocus: { child in focusSession(child) }
                     )
                     .id(session.stableId)
-
-                    let children = childSessions(of: session)
-                    if !children.isEmpty {
-                        ChildSessionsView(
-                            children: children,
-                            onFocus: { child in focusSession(child) }
-                        )
-                    }
-
-                    // Subagent rows under this session
-                    if session.subagentState.hasActiveSubagent {
-                        SubagentListView(session: session)
-                    }
 
                     // Gradient divider between rows
                     if index < sortedInstances.count - 1 {
@@ -455,17 +444,11 @@ struct ClaudeInstancesView: View {
                                 onChat: { openChat(session) },
                                 onArchive: { archiveSession(session) },
                                 onApprove: { approveSession(session) },
-                                onReject: { rejectSession(session) }
+                                onReject: { rejectSession(session) },
+                                childItems: childAgentItems(for: session),
+                                onChildFocus: { child in focusSession(child) }
                             )
                             .id(session.stableId)
-
-                            let children = childSessions(of: session)
-                            if !children.isEmpty {
-                                ChildSessionsView(
-                                    children: children,
-                                    onFocus: { child in focusSession(child) }
-                                )
-                            }
                         }
                     }
                 }
