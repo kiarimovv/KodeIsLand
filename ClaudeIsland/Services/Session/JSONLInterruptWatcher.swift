@@ -34,14 +34,35 @@ class JSONLInterruptWatcher {
         "Interrupted by user",
         "interrupted by user",
         "user doesn't want to proceed",
-        "[Request interrupted by user"
+        "[Request interrupted by user",
+        "Cancelled",
+        "cancelled"
     ]
 
     init(sessionId: String, cwd: String) {
         self.sessionId = sessionId
+        self.filePath = JSONLInterruptWatcher.findFilePath(sessionId: sessionId, cwd: cwd)
+    }
+
+    /// Try cwd and parent directories (matching ConversationParser behavior)
+    private static func findFilePath(sessionId: String, cwd: String) -> String {
+        let home = NSHomeDirectory()
+        var dir = cwd
+        while true {
+            let projectDir = dir.replacingOccurrences(of: "/", with: "-")
+                               .replacingOccurrences(of: ".", with: "-")
+            let path = home + "/.claude/projects/" + projectDir + "/" + sessionId + ".jsonl"
+            if FileManager.default.fileExists(atPath: path) {
+                return path
+            }
+            let parent = (dir as NSString).deletingLastPathComponent
+            if parent == dir || parent == "/" || parent.isEmpty { break }
+            dir = parent
+        }
+        // fallback to exact cwd path
         let projectDir = cwd.replacingOccurrences(of: "/", with: "-")
                             .replacingOccurrences(of: ".", with: "-")
-        self.filePath = NSHomeDirectory() + "/.claude/projects/" + projectDir + "/" + sessionId + ".jsonl"
+        return home + "/.claude/projects/" + projectDir + "/" + sessionId + ".jsonl"
     }
 
     /// Start watching the JSONL file for interrupts
@@ -143,6 +164,11 @@ class JSONLInterruptWatcher {
                     return true
                 }
             }
+        }
+
+        // result-level error (e.g. Claude Code writes {"type":"result","is_error":true,...})
+        if line.contains("\"type\":\"result\"") && line.contains("\"is_error\":true") {
+            return true
         }
 
         if line.contains("\"interrupted\":true") {

@@ -32,7 +32,7 @@ class ClaudeSessionMonitor: ObservableObject {
 
     func startMonitoring() {
         Task {
-            await SessionStore.shared.startZombieScan()
+            await SessionStore.shared.startZombieScan(interval: 5)
         }
 
         HookSocketServer.shared.start(
