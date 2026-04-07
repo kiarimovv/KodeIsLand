@@ -8,7 +8,13 @@
 
 import Foundation
 
-/// Complete state for a single Claude session
+/// Which AI coding tool this session belongs to
+enum SessionSource: String, Sendable, Equatable {
+    case claude
+    case opencode
+}
+
+/// Complete state for a single Claude/OpenCode session
 /// This is the single source of truth - all state reads and writes go through SessionStore
 struct SessionState: Equatable, Identifiable, Sendable {
     // MARK: - Identity
@@ -16,6 +22,8 @@ struct SessionState: Equatable, Identifiable, Sendable {
     let sessionId: String
     let cwd: String
     let projectName: String
+    /// Which tool created this session
+    let source: SessionSource
 
     // MARK: - Instance Metadata
 
@@ -45,6 +53,11 @@ struct SessionState: Equatable, Identifiable, Sendable {
     /// State for Task tools and their nested subagent tools
     var subagentState: SubagentState
 
+    // MARK: - 进程级父子关系（OpenCode subagent 会话）
+
+    /// 父会话 ID（当本会话是 OpenCode subagent 子进程时设置）
+    var parentSessionId: String?
+
     // MARK: - Conversation Info (from JSONL parsing)
 
     var conversationInfo: ConversationInfo
@@ -70,6 +83,7 @@ struct SessionState: Equatable, Identifiable, Sendable {
         sessionId: String,
         cwd: String,
         projectName: String? = nil,
+        source: SessionSource = .claude,
         pid: Int? = nil,
         tty: String? = nil,
         isInTmux: Bool = false,
@@ -78,6 +92,7 @@ struct SessionState: Equatable, Identifiable, Sendable {
         chatItems: [ChatHistoryItem] = [],
         toolTracker: ToolTracker = ToolTracker(),
         subagentState: SubagentState = SubagentState(),
+        parentSessionId: String? = nil,
         conversationInfo: ConversationInfo = ConversationInfo(
             summary: nil, lastMessage: nil, lastMessageRole: nil,
             lastToolName: nil, firstUserMessage: nil, latestUserMessage: nil, lastUserMessageDate: nil
@@ -89,6 +104,7 @@ struct SessionState: Equatable, Identifiable, Sendable {
         self.sessionId = sessionId
         self.cwd = cwd
         self.projectName = projectName ?? URL(fileURLWithPath: cwd).lastPathComponent
+        self.source = source
         self.pid = pid
         self.tty = tty
         self.isInTmux = isInTmux
@@ -97,6 +113,7 @@ struct SessionState: Equatable, Identifiable, Sendable {
         self.chatItems = chatItems
         self.toolTracker = toolTracker
         self.subagentState = subagentState
+        self.parentSessionId = parentSessionId
         self.conversationInfo = conversationInfo
         self.needsClearReconciliation = needsClearReconciliation
         self.lastActivity = lastActivity
@@ -313,6 +330,10 @@ struct SessionState: Equatable, Identifiable, Sendable {
     /// Whether the session can be interacted with
     var canInteract: Bool {
         phase.needsAttention
+    }
+
+    var isChildSession: Bool {
+        parentSessionId != nil
     }
 }
 

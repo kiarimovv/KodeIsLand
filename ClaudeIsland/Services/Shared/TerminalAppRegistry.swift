@@ -56,10 +56,21 @@ struct TerminalAppRegistry: Sendable {
 
     /// Map a process command name to a friendly display name
     static func displayName(for command: String) -> String {
-        let lower = command.lowercased()
+        let basename = URL(fileURLWithPath: command).lastPathComponent.lowercased()
 
-        // Known mappings (process name → display name)
-        let mappings: [(match: String, name: String)] = [
+        let exactMappings: [String: String] = [
+            "code": "VS Code",
+            "code - insiders": "VS Code",
+            "st": "st",
+            "zed": "Zed",
+            "rio": "Rio",
+        ]
+
+        if let name = exactMappings[basename] {
+            return name
+        }
+
+        let containsMappings: [(match: String, name: String)] = [
             ("ghostty", "Ghostty"),
             ("warp", "Warp"),
             ("stable", "Warp"),      // Warp's binary is called "stable"
@@ -71,16 +82,13 @@ struct TerminalAppRegistry: Sendable {
             ("hyper", "Hyper"),
             ("tabby", "Tabby"),
             ("cmux", "cmux"),
-            ("code", "VS Code"),
             ("cursor", "Cursor"),
             ("windsurf", "Windsurf"),
-            ("zed", "Zed"),
-            ("rio", "Rio"),
             ("tmux", "tmux"),
         ]
 
-        for (match, name) in mappings {
-            if lower.contains(match) { return name }
+        for (match, name) in containsMappings {
+            if basename.contains(match) { return name }
         }
 
         return command // fallback to raw command name
@@ -88,17 +96,30 @@ struct TerminalAppRegistry: Sendable {
 
     /// Check if an app name or command path is a known terminal
     static func isTerminal(_ appNameOrCommand: String) -> Bool {
-        let lower = appNameOrCommand.lowercased()
+        let basename = URL(fileURLWithPath: appNameOrCommand).lastPathComponent.lowercased()
 
-        // Check if any known app name is contained in the command (case-insensitive)
-        for name in appNames {
-            if lower.contains(name.lowercased()) {
-                return true
-            }
+        if appNames.contains(where: { $0.lowercased() == basename }) {
+            return true
         }
 
-        // Additional checks for common patterns
-        return lower.contains("terminal") || lower.contains("iterm")
+        let containsPatterns = [
+            "ghostty",
+            "warp",
+            "stable",
+            "iterm",
+            "terminal",
+            "alacritty",
+            "kitty",
+            "wezterm",
+            "hyper",
+            "tabby",
+            "cmux",
+            "cursor",
+            "windsurf",
+            "tmux",
+        ]
+
+        return containsPatterns.contains(where: { basename.contains($0) })
     }
 
     /// Check if a bundle identifier is a known terminal

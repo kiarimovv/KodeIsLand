@@ -137,10 +137,10 @@ struct NotchView: View {
     }
 
     /// Extra width for expanding activities (like Dynamic Island)
-    /// Just enough to show status on left wing and count on right wing
+    /// Left wing: ~190px for buddy + carousel text; right wing: dots only (~50px max)
     private var expansionWidth: CGFloat {
         if hasActiveSessions {
-            return 240
+            return 220
         }
         return 0
     }
@@ -784,22 +784,11 @@ struct CollapsedNotchContent: View {
             Spacer()
 
             // ── Right wing (visible right of camera) ──
-            HStack(spacing: 4) {
-                if let parts = activityTextParts {
-                    Text(parts.project)
-                        .font(.system(size: 13, weight: .medium, design: .monospaced))
-                        .foregroundColor(.white.opacity(0.6))
-                        .lineLimit(1)
-
-                }
-
-                if activeSessionCount > 0 {
-                    Text("\u{00D7}\(activeSessionCount)")
-                        .font(.system(size: 13, weight: .medium, design: .monospaced))
-                        .foregroundColor(badgeColor)
-                }
-            }
-            .padding(.trailing, 6)
+            // Use per-session dots so each session shows its own phase color.
+            // This prevents a single session's amber state from making all sessions appear yellow,
+            // and keeps the right wing compact enough to avoid being hidden by the notch.
+            sessionDots
+                .padding(.trailing, 6)
         }
         .onReceive(carouselTimer) { _ in
             withAnimation(.easeInOut(duration: 0.3)) {

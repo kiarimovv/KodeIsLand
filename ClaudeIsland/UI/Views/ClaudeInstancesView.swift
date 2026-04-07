@@ -283,6 +283,8 @@ struct ClaudeInstancesView: View {
     private var sortedInstances: [SessionState] {
         sessionMonitor.instances
         .filter { session in
+            // 过滤掉子会话（在父会话下方单独渲染）
+            if session.isChildSession { return false }
             // Filter out short-lived ended sessions (< 30s, likely from rate limit checks)
             if session.phase == .ended {
                 let duration = Date().timeIntervalSince(session.createdAt)
@@ -319,6 +321,12 @@ struct ClaudeInstancesView: View {
         ProjectGroup.group(sessions: sortedInstances)
     }
 
+    private func childSessions(of parent: SessionState) -> [SessionState] {
+        sessionMonitor.instances
+            .filter { $0.parentSessionId == parent.sessionId }
+            .sorted { $0.createdAt < $1.createdAt }
+    }
+
     private var flatList: some View {
         ScrollView(.vertical, showsIndicators: false) {
             LazyVStack(spacing: 0) {
@@ -332,6 +340,14 @@ struct ClaudeInstancesView: View {
                         onReject: { rejectSession(session) }
                     )
                     .id(session.stableId)
+
+                    let children = childSessions(of: session)
+                    if !children.isEmpty {
+                        ChildSessionsView(
+                            children: children,
+                            onFocus: { child in focusSession(child) }
+                        )
+                    }
 
                     // Subagent rows under this session
                     if session.subagentState.hasActiveSubagent {
@@ -434,6 +450,14 @@ struct ClaudeInstancesView: View {
                                 onReject: { rejectSession(session) }
                             )
                             .id(session.stableId)
+
+                            let children = childSessions(of: session)
+                            if !children.isEmpty {
+                                ChildSessionsView(
+                                    children: children,
+                                    onFocus: { child in focusSession(child) }
+                                )
+                            }
                         }
                     }
                 }
@@ -447,7 +471,10 @@ struct ClaudeInstancesView: View {
     // MARK: - Actions
 
     private func focusSession(_ session: SessionState) {
-        Task { await TerminalJumper.shared.jump(to: session) }
+        Task {
+            await TerminalJumper.shared.jump(to: session)
+            viewModel.notchClose()
+        }
     }
 
     private func openChat(_ session: SessionState) {
@@ -522,6 +549,22 @@ struct InstanceRow: View {
         if tag.contains("code") { return Color(red: 0.29, green: 0.67, blue: 0.96) }       // vs blue
         if tag.contains("kitty") { return Color(red: 0.94, green: 0.5, blue: 0.5) }        // salmon
         return Color.white.opacity(0.4)
+    }
+
+    /// Source label text
+    private var sourceTag: String {
+        switch session.source {
+        case .claude: return "CC"
+        case .opencode: return "OC"
+        }
+    }
+
+    /// Source label color
+    private var sourceTagColor: Color {
+        switch session.source {
+        case .claude: return Color(red: 0.376, green: 0.647, blue: 0.98)   // blue
+        case .opencode: return Color(red: 0.74, green: 0.56, blue: 1.0)    // purple
+        }
     }
 
     /// Terminal app name — auto-detected from process tree
@@ -644,6 +687,16 @@ struct InstanceRow: View {
                                 )
                         }
 
+                        // Source badge — CC (Claude Code) or OC (OpenCode)
+                        Text(sourceTag)
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundColor(sourceTagColor)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            .background(
+                                Capsule().fill(sourceTagColor.opacity(0.12))
+                            )
+
                         // Terminal tag — colored by terminal type
                         Text(terminalTag)
                             .font(.system(size: 8, weight: .semibold))
@@ -671,15 +724,13 @@ struct InstanceRow: View {
                             .contentShape(Rectangle())
                             .onTapGesture { onFocus() }
 
-                        // Delete button (ended/idle sessions)
-                        if !isActive {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 8, weight: .medium))
-                                .foregroundColor(.white.opacity(0.25))
-                                .frame(width: 16, height: 16)
-                                .contentShape(Rectangle())
-                                .onTapGesture { onArchive() }
-                        }
+                        // Dismiss from CodeIsland (all sessions)
+                        Image(systemName: "xmark")
+                            .font(.system(size: 8, weight: .medium))
+                            .foregroundColor(.white.opacity(isActive ? 0.15 : 0.25))
+                            .frame(width: 16, height: 16)
+                            .contentShape(Rectangle())
+                            .onTapGesture { onArchive() }
                     }
 
                     // Subtitle
@@ -1234,6 +1285,107 @@ struct TerminalButton: View {
     }
 }
 
+// MARK: - Child Sessions View (OpenCode subagent 进程级子会话)
+
+struct ChildSessionsView: View {
+    let children: [SessionState]
+    let onFocus: (SessionState) -> Void
+
+    @State private var isExpanded = true
+
+    private static let childColor = Color(red: 0.5, green: 0.75, blue: 0.95)
+
+    private func phaseIcon(_ phase: SessionPhase) -> String {
+        switch phase {
+        case .processing, .compacting: return "bolt.fill"
+        case .waitingForApproval: return "exclamationmark.circle.fill"
+        case .waitingForInput: return "checkmark.circle.fill"
+        case .idle, .ended: return "circle.fill"
+        }
+    }
+
+    private func phaseColor(_ phase: SessionPhase) -> Color {
+        switch phase {
+        case .processing, .compacting: return Color(red: 0.4, green: 0.91, blue: 0.98)
+        case .waitingForApproval: return Color(red: 0.96, green: 0.62, blue: 0.04)
+        case .waitingForInput: return Color(red: 0.29, green: 0.87, blue: 0.5)
+        case .idle, .ended: return .white.opacity(0.25)
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 4) {
+                Rectangle()
+                    .fill(Self.childColor.opacity(0.15))
+                    .frame(width: 1, height: 14)
+                    .padding(.leading, 18)
+
+                Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                    .font(.system(size: 7, weight: .medium))
+                    .foregroundColor(Self.childColor.opacity(0.4))
+
+                Text("↳ \(children.count) subagent")
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundColor(Self.childColor.opacity(0.5))
+
+                Spacer()
+            }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    isExpanded.toggle()
+                }
+            }
+            .padding(.vertical, 3)
+
+            if isExpanded {
+                ForEach(children) { child in
+                    HStack(spacing: 5) {
+                        HStack(spacing: 0) {
+                            Rectangle()
+                                .fill(Self.childColor.opacity(0.15))
+                                .frame(width: 1)
+                            Rectangle()
+                                .fill(Self.childColor.opacity(0.15))
+                                .frame(width: 8, height: 1)
+                        }
+                        .frame(width: 12, height: 16)
+                        .padding(.leading, 18)
+
+                        Image(systemName: phaseIcon(child.phase))
+                            .font(.system(size: 5))
+                            .foregroundColor(phaseColor(child.phase))
+
+                        Text(child.projectName)
+                            .font(.system(size: 9))
+                            .foregroundColor(.white.opacity(0.45))
+                            .lineLimit(1)
+
+                        if let summary = child.smartSummary {
+                            Text("· \(summary)")
+                                .font(.system(size: 8))
+                                .foregroundColor(.white.opacity(0.25))
+                                .lineLimit(1)
+                        }
+
+                        Spacer()
+
+                        Image(systemName: "terminal")
+                            .font(.system(size: 8))
+                            .foregroundColor(Self.childColor.opacity(0.35))
+                            .frame(width: 16, height: 16)
+                            .contentShape(Rectangle())
+                            .onTapGesture { onFocus(child) }
+                    }
+                    .padding(.vertical, 2)
+                }
+            }
+        }
+        .padding(.horizontal, 8)
+    }
+}
+
 // MARK: - Subagent List View
 
 struct SubagentListView: View {
@@ -1443,6 +1595,7 @@ struct UsageStatsBar: View {
                     }
                 }
             }
+            .fixedSize()
 
             // Progress bar
             ZStack(alignment: .leading) {
@@ -1499,6 +1652,7 @@ struct UsageStatsBar: View {
                     .font(.system(size: 9, weight: .semibold, design: .monospaced))
                     .foregroundColor(color)
             }
+            .fixedSize()
 
             if let used = info.premiumUsed, let limit = info.premiumLimit, limit > 0 {
                 // Progress bar (premium requests)

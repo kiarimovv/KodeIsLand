@@ -12,42 +12,52 @@ import os.log
 /// Logger for hook socket server
 private let logger = Logger(subsystem: "com.codeisland", category: "Hooks")
 
-/// Event received from Claude Code hooks
+/// Event received from Claude Code or OpenCode hooks
 struct HookEvent: Codable, Sendable {
     let sessionId: String
     let cwd: String
     let event: String
     let status: String
     let pid: Int?
+    var ppid: Int?
     let tty: String?
     let tool: String?
     let toolInput: [String: AnyCodable]?
     let toolUseId: String?
     let notificationType: String?
     let message: String?
+    /// Hook source: "claude" (default) or "opencode"
+    let source: String?
+    /// TERM_PROGRAM env var from the shell that launched opencode (e.g. "ghostty", "vscode")
+    /// More reliable than PID-based terminal detection for opencode daemon processes.
+    let termProgram: String?
 
     enum CodingKeys: String, CodingKey {
         case sessionId = "session_id"
-        case cwd, event, status, pid, tty, tool
+        case cwd, event, status, pid, ppid, tty, tool
         case toolInput = "tool_input"
         case toolUseId = "tool_use_id"
         case notificationType = "notification_type"
-        case message
+        case message, source
+        case termProgram = "term_program"
     }
 
     /// Create a copy with updated toolUseId
-    init(sessionId: String, cwd: String, event: String, status: String, pid: Int?, tty: String?, tool: String?, toolInput: [String: AnyCodable]?, toolUseId: String?, notificationType: String?, message: String?) {
+    init(sessionId: String, cwd: String, event: String, status: String, pid: Int?, ppid: Int?, tty: String?, tool: String?, toolInput: [String: AnyCodable]?, toolUseId: String?, notificationType: String?, message: String?, source: String? = nil, termProgram: String? = nil) {
         self.sessionId = sessionId
         self.cwd = cwd
         self.event = event
         self.status = status
         self.pid = pid
+        self.ppid = ppid
         self.tty = tty
         self.tool = tool
         self.toolInput = toolInput
         self.toolUseId = toolUseId
         self.notificationType = notificationType
         self.message = message
+        self.source = source
+        self.termProgram = termProgram
     }
 
     var sessionPhase: SessionPhase {
@@ -442,12 +452,15 @@ class HookSocketServer {
                 event: event.event,
                 status: event.status,
                 pid: event.pid,
+                ppid: event.ppid,
                 tty: event.tty,
                 tool: event.tool,
                 toolInput: event.toolInput,
                 toolUseId: toolUseId,  // Use resolved toolUseId
                 notificationType: event.notificationType,
-                message: event.message
+                message: event.message,
+                source: event.source,
+                termProgram: event.termProgram
             )
 
             let pending = PendingPermission(

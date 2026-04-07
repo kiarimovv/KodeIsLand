@@ -126,22 +126,68 @@ actor SessionStore {
         let sessionId = event.sessionId
         let isNewSession = sessions[sessionId] == nil
         DebugLogger.log("Hook", "\(event.event) status=\(event.status) sid=\(sessionId.prefix(8)) new=\(isNewSession)")
+
+        if isNewSession, event.source == "opencode", let ppid = event.ppid {
+            // 精确匹配：父会话的 pid == 子进程的 ppid（OpenCode 子进程场景）
+            // 注意：不用 cwd 做备选匹配，同目录的独立 OpenCode 会话不是父子关系
+            let parentId = sessions.first { entry in
+                let s = entry.value
+                return s.source == .opencode && s.pid == ppid
+            }?.key
+
+            if let parentId {
+                var childSession = createSession(from: event)
+                childSession.parentSessionId = parentId
+                sessions[event.sessionId] = childSession
+                if var parent = sessions[parentId] {
+                    parent.lastActivity = Date()
+                    sessions[parentId] = parent
+                }
+                DebugLogger.log(
+                    "Hook",
+                    "Created opencode child session sid=\(sessionId.prefix(8)) ppid=\(ppid) parent=\(parentId.prefix(8))"
+                )
+                publishState()
+                return
+            }
+            DebugLogger.log("Hook", "No parent found for new opencode sid=\(sessionId.prefix(8)) ppid=\(ppid)")
+        }
+
         var session = sessions[sessionId] ?? createSession(from: event)
 
+        // If session was previously ended (e.g. Claude Code closed then /resume'd),
+        // treat this incoming event as a resurrection — reset to idle so phase
+        // transitions work normally again.
+        if session.phase == .ended {
+            session.phase = .idle
+            session.toolTracker = ToolTracker()
+            session.subagentState = SubagentState()
+            Self.logger.info("Session \(sessionId.prefix(8), privacy: .public) resurrected from ended state")
+        }
+
         session.pid = event.pid
-        if let pid = event.pid {
+        if session.terminalApp == nil {
+            if let termProgram = event.termProgram, !termProgram.isEmpty {
+                // opencode sends TERM_PROGRAM from its shell environment — most reliable source
+                session.terminalApp = TerminalAppRegistry.displayName(for: termProgram)
+                DebugLogger.log("Hook", "termProgram=\(termProgram) → \(session.terminalApp ?? "nil")")
+            } else if let pid = event.pid {
+                // Claude Code sends pid — walk process tree to find terminal
+                let tree = ProcessTreeBuilder.shared.buildTree()
+                session.isInTmux = ProcessTreeBuilder.shared.isInTmux(pid: pid, tree: tree)
+                if let termPid = ProcessTreeBuilder.shared.findTerminalPid(forProcess: pid, tree: tree),
+                   let termInfo = tree[termPid] {
+                    let command = URL(fileURLWithPath: termInfo.command).lastPathComponent
+                    session.terminalApp = TerminalAppRegistry.displayName(for: command)
+                }
+                if isNewSession {
+                    DebugLogger.log("Hook", "pid=\(pid) tmux=\(session.isInTmux) termApp=\(session.terminalApp ?? "nil")")
+                }
+            }
+        } else if let pid = event.pid, session.source == .claude {
+            // Still update tmux status for Claude Code sessions even if terminalApp is already set
             let tree = ProcessTreeBuilder.shared.buildTree()
             session.isInTmux = ProcessTreeBuilder.shared.isInTmux(pid: pid, tree: tree)
-            // Detect terminal app name
-            if session.terminalApp == nil,
-               let termPid = ProcessTreeBuilder.shared.findTerminalPid(forProcess: pid, tree: tree),
-               let termInfo = tree[termPid] {
-                let command = URL(fileURLWithPath: termInfo.command).lastPathComponent
-                session.terminalApp = TerminalAppRegistry.displayName(for: command)
-            }
-            if isNewSession {
-                DebugLogger.log("Hook", "pid=\(pid) tmux=\(session.isInTmux) termApp=\(session.terminalApp ?? "nil")")
-            }
         }
         if let tty = event.tty {
             session.tty = tty.replacingOccurrences(of: "/dev/", with: "")
@@ -176,17 +222,28 @@ actor SessionStore {
             session.subagentState = SubagentState()
         }
 
-        // Parse conversationInfo only when needed (not on every event — too expensive for large JSONL)
-        if session.conversationInfo.firstUserMessage == nil ||
-           (session.phase == .waitingForInput && session.conversationInfo.lastMessage == nil) {
-            DebugLogger.log("Store", "Parsing conversationInfo for \(sessionId.prefix(8))")
-            let conversationInfo = await ConversationParser.shared.parse(
-                sessionId: sessionId,
-                cwd: event.cwd
-            )
-            if conversationInfo.firstUserMessage != nil {
-                session.conversationInfo = conversationInfo
-                DebugLogger.log("Store", "Got: first=\(conversationInfo.firstUserMessage?.prefix(30) ?? "nil")")
+        // Parse conversationInfo when needed (not on every event — too expensive)
+        let needsInfo = session.conversationInfo.firstUserMessage == nil ||
+            (session.phase == .waitingForInput && session.conversationInfo.lastMessage == nil)
+
+        if needsInfo {
+            DebugLogger.log("Store", "Parsing conversationInfo for \(sessionId.prefix(8)) source=\(session.source.rawValue)")
+            if session.source == .opencode {
+                // OpenCode stores conversations in SQLite (~/.local/share/opencode/opencode.db)
+                if let info = await OpenCodeConversationParser.shared.parse(sessionId: sessionId) {
+                    session.conversationInfo = info
+                    DebugLogger.log("Store", "OpenCode: title=\(info.summary?.prefix(30) ?? "nil")")
+                }
+            } else {
+                // Claude Code stores conversations in ~/.claude/projects/**/*.jsonl
+                let conversationInfo = await ConversationParser.shared.parse(
+                    sessionId: sessionId,
+                    cwd: event.cwd
+                )
+                if conversationInfo.firstUserMessage != nil {
+                    session.conversationInfo = conversationInfo
+                    DebugLogger.log("Store", "Claude: first=\(conversationInfo.firstUserMessage?.prefix(30) ?? "nil")")
+                }
             }
         }
 
@@ -199,10 +256,15 @@ actor SessionStore {
     }
 
     private func createSession(from event: HookEvent) -> SessionState {
-        SessionState(
+        // OpenCode sends source="opencode" when its MJS plugin is active.
+        // Fallback: OpenCode session IDs always start with "ses_"; Claude Code uses UUIDs.
+        let source: SessionSource = (event.source == "opencode" || event.sessionId.hasPrefix("ses_"))
+            ? .opencode : .claude
+        return SessionState(
             sessionId: event.sessionId,
             cwd: event.cwd,
             projectName: URL(fileURLWithPath: event.cwd).lastPathComponent,
+            source: source,
             pid: event.pid,
             tty: event.tty?.replacingOccurrences(of: "/dev/", with: ""),
             isInTmux: false,  // Will be updated

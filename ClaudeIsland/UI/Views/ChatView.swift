@@ -90,7 +90,7 @@ struct ChatView: View {
                             ))
                     }
                 } else {
-                    goToTerminalBar
+                    inputBar
                         .transition(.opacity)
                 }
             }
@@ -168,7 +168,7 @@ struct ChatView: View {
             }
         }
         .onAppear {
-            // No auto-focus needed since input bar is removed
+            isInputFocused = true
         }
     }
 
@@ -349,35 +349,50 @@ struct ChatView: View {
         }
     }
 
-    // MARK: - Go To Terminal Bar
+    // MARK: - Input Bar
 
-    private var goToTerminalBar: some View {
-        HStack(spacing: 10) {
-            Button {
-                Task { await activateTerminal() }
-            } label: {
-                HStack(spacing: 8) {
+    private var inputBar: some View {
+        HStack(spacing: 8) {
+            TextField(isProcessing ? L10n.processing + "..." : "Message...", text: $inputText)
+                .textFieldStyle(.plain)
+                .font(.system(size: 13))
+                .foregroundColor(.white.opacity(isProcessing ? 0.4 : 0.9))
+                .focused($isInputFocused)
+                .disabled(isProcessing)
+                .onSubmit { sendInput() }
+
+            if inputText.isEmpty {
+                Button {
+                    Task { await activateTerminal() }
+                } label: {
                     Image(systemName: "terminal")
-                        .font(.system(size: 14, weight: .medium))
-                    Text(L10n.goToTerminal)
-                        .font(.system(size: 13, weight: .medium))
+                        .font(.system(size: 12))
+                        .foregroundColor(.white.opacity(0.3))
+                        .frame(width: 28, height: 28)
+                        .background(RoundedRectangle(cornerRadius: 6).fill(Color.white.opacity(0.06)))
                 }
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 10)
-                .background(
-                    RoundedRectangle(cornerRadius: 20)
-                        .fill(Color.white.opacity(0.12))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 20)
-                                .strokeBorder(Color.white.opacity(0.15), lineWidth: 1)
-                        )
-                )
+                .buttonStyle(.plain)
+            } else {
+                Button { sendInput() } label: {
+                    Image(systemName: "arrow.up.circle.fill")
+                        .font(.system(size: 22))
+                        .foregroundColor(.white.opacity(0.8))
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
         }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color.white.opacity(0.07))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
+                )
+        )
         .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.vertical, 10)
         .background(Color.black.opacity(0.2))
         .overlay(alignment: .top) {
             LinearGradient(
@@ -386,10 +401,115 @@ struct ChatView: View {
                 endPoint: .bottom
             )
             .frame(height: 24)
-            .offset(y: -24) // Push above input bar
+            .offset(y: -24)
             .allowsHitTesting(false)
         }
-        .zIndex(1) // Render above message list
+        .zIndex(1)
+    }
+
+    // MARK: - Send Input
+
+    private func sendInput() {
+        let text = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty, !isProcessing else { return }
+        inputText = ""
+        Task { await sendTextToSession(text) }
+    }
+
+    /// Send text to the terminal running this session.
+    /// Strategy: iTerm2 by tty → Terminal.app → cmux → clipboard fallback.
+    private func sendTextToSession(_ text: String) async {
+        let termApp = session.terminalApp?.lowercased() ?? ""
+        // Escape for AppleScript string literals
+        let escaped = text
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+
+        // 1. iTerm2: find the exact session by tty, no window focus needed
+        if termApp.contains("iterm"), let tty = session.tty {
+            let ttyName = tty.hasPrefix("/dev/") ? String(tty.dropFirst(5)) : tty
+            let script = """
+            tell application "System Events"
+                if not (exists process "iTerm2") then return false
+            end tell
+            tell application "iTerm2"
+                repeat with w in windows
+                    repeat with t in tabs of w
+                        repeat with s in sessions of t
+                            try
+                                if tty of s contains "\(ttyName)" then
+                                    write text "\(escaped)" to s
+                                    return true
+                                end if
+                            end try
+                        end repeat
+                    end repeat
+                end repeat
+            end tell
+            return false
+            """
+            if await runAppleScriptBool(script) { return }
+        }
+
+        // 2. Terminal.app
+        if termApp.contains("terminal") && !termApp.contains("wez") {
+            _ = await TerminalJumper.shared.jump(to: session)
+            let script = """
+            tell application "Terminal"
+                if (count of windows) > 0 then
+                    do script "\(escaped)" in selected tab of front window
+                    return true
+                end if
+            end tell
+            return false
+            """
+            if await runAppleScriptBool(script) { return }
+        }
+
+        // 3. cmux
+        let cmuxPath = "/Applications/cmux.app/Contents/Resources/bin/cmux"
+        if FileManager.default.isExecutableFile(atPath: cmuxPath) {
+            let dirName = URL(fileURLWithPath: session.cwd).lastPathComponent
+            let process = Process()
+            let pipe = Pipe()
+            process.executableURL = URL(fileURLWithPath: cmuxPath)
+            process.arguments = ["find-window", "--content", "--select", dirName]
+            process.standardOutput = pipe
+            process.standardError = FileHandle.nullDevice
+            if let _ = try? process.run() {
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                process.waitUntilExit()
+                if process.terminationStatus == 0,
+                   let output = String(data: data, encoding: .utf8),
+                   let wsRef = output.components(separatedBy: "\n").first(where: { $0.contains("workspace:") })?.components(separatedBy: " ").first(where: { $0.hasPrefix("workspace:") }) {
+                    let sendProcess = Process()
+                    sendProcess.executableURL = URL(fileURLWithPath: cmuxPath)
+                    sendProcess.arguments = ["send", "--workspace", wsRef, "--", text + "\r"]
+                    sendProcess.standardError = FileHandle.nullDevice
+                    if let _ = try? sendProcess.run() {
+                        sendProcess.waitUntilExit()
+                        if sendProcess.terminationStatus == 0 { return }
+                    }
+                }
+            }
+        }
+
+        // 4. Fallback: copy to clipboard and jump to terminal
+        await MainActor.run {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(text, forType: .string)
+        }
+        _ = await TerminalJumper.shared.jump(to: session)
+    }
+
+    @discardableResult
+    private func runAppleScriptBool(_ source: String) async -> Bool {
+        do {
+            let result = try await ProcessExecutor.shared.run("/usr/bin/osascript", arguments: ["-e", source])
+            return result.trimmingCharacters(in: .whitespacesAndNewlines) == "true"
+        } catch {
+            return false
+        }
     }
 
     // MARK: - Approval Bar
@@ -432,7 +552,10 @@ struct ChatView: View {
     // MARK: - Actions
 
     private func focusTerminal() {
-        Task { await TerminalJumper.shared.jump(to: session) }
+        Task {
+            await TerminalJumper.shared.jump(to: session)
+            viewModel.notchClose()
+        }
     }
 
     private func approvePermission() {
@@ -446,6 +569,7 @@ struct ChatView: View {
     /// Activate the terminal window for this session
     private func activateTerminal() async {
         await TerminalJumper.shared.jump(to: session)
+        viewModel.notchClose()
     }
 }
 
