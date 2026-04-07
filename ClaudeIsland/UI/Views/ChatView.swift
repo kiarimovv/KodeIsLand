@@ -417,7 +417,7 @@ struct ChatView: View {
     }
 
     /// Send text to the terminal running this session.
-    /// Strategy: iTerm2 by tty → Terminal.app → cmux → clipboard fallback.
+    /// Strategy: iTerm2 → Terminal.app → tmux → Ghostty (clipboard+paste) → cmux → clipboard fallback.
     private func sendTextToSession(_ text: String) async {
         let termApp = session.terminalApp?.lowercased() ?? ""
         // Escape for AppleScript string literals
@@ -466,7 +466,35 @@ struct ChatView: View {
             if await runAppleScriptBool(script) { return }
         }
 
-        // 3. cmux
+        // 3. tmux send-keys (works with any terminal that uses tmux)
+        if session.isInTmux, let pid = session.pid {
+            if let target = await TmuxTargetFinder.shared.findTarget(forClaudePid: pid) {
+                if await ToolApprovalHandler.shared.sendMessage(text, to: target) { return }
+            }
+        }
+
+        // 4. Ghostty: clipboard + focus correct window + AppleScript paste (Cmd+V)
+        if termApp.contains("ghostty") {
+            await MainActor.run {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(text, forType: .string)
+            }
+            _ = await TerminalJumper.shared.jump(to: session)
+            try? await Task.sleep(for: .milliseconds(150))
+            let pasteScript = """
+            tell application "System Events"
+                tell process "Ghostty"
+                    keystroke "v" using {command down}
+                    delay 0.05
+                    key code 36
+                end tell
+            end tell
+            """
+            _ = try? await ProcessExecutor.shared.run("/usr/bin/osascript", arguments: ["-e", pasteScript])
+            return
+        }
+
+        // 5. cmux
         let cmuxPath = "/Applications/cmux.app/Contents/Resources/bin/cmux"
         if FileManager.default.isExecutableFile(atPath: cmuxPath) {
             let dirName = URL(fileURLWithPath: session.cwd).lastPathComponent
@@ -494,7 +522,7 @@ struct ChatView: View {
             }
         }
 
-        // 4. Fallback: copy to clipboard and jump to terminal
+        // 6. Fallback: copy to clipboard and jump to terminal
         await MainActor.run {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(text, forType: .string)
